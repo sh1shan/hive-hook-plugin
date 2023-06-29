@@ -197,7 +197,9 @@ public class MetaStorePreAuditListener extends MetaStorePreEventListener {
         List<String> parts = new ArrayList<>();
         List<FieldSchema> partitionKeys = this.getPartitionKeys(table);
         if (partitionKeys != null) {
-            Partition partition = preDropPartitionEvent.getPartition();
+            //TODO 为了不报错，占位
+            Partition partition = new Partition();
+            //Partition partition = preDropPartitionEvent.getPartition();
             List<String> partitionValues = partition.getValues();
             if (partitionKeys.size() != partitionValues.size()) {
                 LOG.error("find table partitionKeys do not equal to partition event value size, table : {}.{}, , partitionKeys : {}, partition : {}", new Object[]{table.getDbName(), table.getTableName(), table.getPartitionKeys(), JsonUtils.toJsonString(partition)});

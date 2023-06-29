@@ -61,7 +61,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                 String[] userGroupNames = null;
                 Long timestamp = null;
                 long duration = 0L;
-                final List<String> jobIds = new ArrayList<String>();
+                final List<String> jobIds = new ArrayList<>();
                 String engine = null;
                 String database = null;
                 String hash = null;
