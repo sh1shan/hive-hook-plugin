@@ -50,12 +50,14 @@ public class LineageLoggerHook implements ExecuteWithHookContext
     
     @Override
     public void run(final HookContext hookContext) {
+        //这一步和官方的demo基本相似
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         final QueryPlan plan = hookContext.getQueryPlan();
         final LineageCtx.Index index = hookContext.getIndex();
         final SessionState ss = SessionState.get();
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
+                //获取信息
                 String version = null;
                 String user = null;
                 String[] userGroupNames = null;
@@ -93,6 +95,8 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                 final List<Edge> edges = this.getEdges(plan, index);
                 final List<TableLineage> tableLineages = this.buildTableLineages(edges);
                 final List<ColumnLineage> columnLineages = this.buildColumnLineages(edges);
+
+                //消息设置
                 final LineageHookInfo lhInfo = new LineageHookInfo();
                 lhInfo.setConf(hookContext.getConf().get("dw_output"));
                 lhInfo.setDatabase(database);
@@ -107,6 +111,8 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                 lhInfo.setVersion(version);
                 lhInfo.setTableLineages(tableLineages);
                 lhInfo.setColumnLineages(columnLineages);
+
+                //提交事件
                 final EventBase<LineageHookInfo> event = new EventBase<LineageHookInfo>();
                 event.setEventType("LINEAGE");
                 event.setContent(lhInfo);
