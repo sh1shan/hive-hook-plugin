@@ -11,33 +11,31 @@
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <hive.version>2.1.1</hive.version>
+        <hadoop.version>2.7.3</hadoop.version>
+        <log4j.version>2.12.1</log4j.version>
     </properties>
-
-    <repositories>
-        <repository>
-            <id>cloudera</id>
-            <name>cloudera</name>
-            <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
-        </repository>
-        <repository>
-            <id>alfresco</id>
-            <name>alfresco</name>
-            <url>https://artifacts.alfresco.com/nexus/content/repositories/public</url>
-        </repository>
-        <repository>
-            <id>spring</id>
-            <name>spring</name>
-            <url>http://repo.spring.io/plugins-release/</url>
-        </repository>
-    </repositories>
 
 
     <dependencies>
-        <dependency>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>hive-exec</artifactId>
-            <version>1.1.0-cdh5.16.2</version>
-        </dependency>
+            <!--添加Hadoop的依赖-->
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-client</artifactId>
+                <version>${hadoop.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.11</version>
+                <scope>test</scope>
+            </dependency>
+            <!--添加hive依赖-->
+            <dependency>
+                <groupId>org.apache.hive</groupId>
+                <artifactId>hive-exec</artifactId>
+                <version>${hive.version}</version>
+            </dependency>
     </dependencies>
 
 </project>

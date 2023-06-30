@@ -122,7 +122,9 @@ public class MetaStoreListener extends MetaStoreEventListener {
         if (partitionEvent.getStatus()) {
             Table table = this.normalizeTable(partitionEvent.getTable());
             List<String> partitions = new ArrayList<>();
-            Partition partition = partitionEvent.getPartition();
+            Iterator<Partition> partitionIterator = partitionEvent.getPartitionIterator();
+            //TODO 为了不报错，先占位
+            Partition partition = new Partition();
             String dropPartName = this.buildDropPartitionName(partition, table);
             if (StringUtils.isNotEmpty(dropPartName)) {
                 partitions.add(dropPartName);
