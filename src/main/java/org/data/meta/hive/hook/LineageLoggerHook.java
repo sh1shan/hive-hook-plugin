@@ -33,6 +33,8 @@ import org.data.meta.hive.model.lineage.Vertex;
 import org.data.meta.hive.service.emitter.EventEmitterFactory;
 import org.data.meta.hive.util.EventUtils;
 import org.data.meta.hive.util.MetaLogUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -66,9 +68,9 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
+        //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
         final LineageCtx.Index index = hookContext.getIndex();
         final SessionState ss = SessionState.get();
-        //TODO 是不是这里把explain脚本过滤了，初始化可以不加，后面上线可以加上
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
                 //获取信息
@@ -95,7 +97,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                     queryTime = System.currentTimeMillis();
                 }
                 duration = System.currentTimeMillis() - queryTime;
-                //TODO 这个UGI 是什么意思？在hadoop审计日志也有这个UGI，这个UGI还自带执行用户信息
+                //TODO 这个UGI是什么意思？在hadoop审计日志也有这个UGI，这个UGI还自带执行用户信息
                 user = hookContext.getUgi().getUserName();
                 userGroupNames = hookContext.getUgi().getGroupNames();
                 timestamp = queryTime / 1000L;
@@ -155,7 +157,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
      * 解析原来的血缘
      *
      * @param plan  执行计划
-     * @param index 这个很神奇的玩意我不知道干嘛的，HOOK在执行前就被赋值来，我估计血缘信息在这里
+     * @param index org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
      * @return
      */
     private List<Edge> getEdges(final QueryPlan plan, final LineageCtx.Index index) {
@@ -273,6 +275,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
 
     /**
      * 字段级血缘关系
+     *
      * @param edges edge
      * @return
      */

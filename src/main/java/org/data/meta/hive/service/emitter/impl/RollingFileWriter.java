@@ -8,12 +8,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RollingFileWriter {
     private static final Logger LOG = LoggerFactory.getLogger(RollingFileWriter.class);
-    private static final String FILE_TMP_DIR = "/tmp";
+    private static final String FILE_TMP_DIR = "/var/log";
     private long lastCheckFileTime = 0L;
     private int lines = 0;
     private FileWriter writer = null;
@@ -85,8 +86,8 @@ public class RollingFileWriter {
                 List<File> existFiles = Arrays.asList(existFileArr);
                 Collections.sort(existFiles);
 
-                for(int i = 0; i < existFiles.size() - 1; ++i) {
-                    File f = (File)existFiles.get(i);
+                for (int i = 0; i < existFiles.size() - 1; ++i) {
+                    File f = (File) existFiles.get(i);
                     boolean deleteResult = f.delete();
                     LOG.warn("delete hook event file : {}:{}", f.getName(), deleteResult);
                 }
@@ -96,7 +97,7 @@ public class RollingFileWriter {
     }
 
     private File findWritingFile() {
-        String dir = "/tmp" + File.separator + System.getProperty("user.name") + File.separator;
+        String dir = "/var/log" + File.separator + System.getProperty("user.name") + File.separator;
         File fileDir = new File(dir);
         if (!fileDir.exists() && !fileDir.mkdirs()) {
             LOG.error("create log file failed : {}", this.file);
