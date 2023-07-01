@@ -43,30 +43,49 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class LineageLoggerHook implements ExecuteWithHookContext
-{
-    private static final HashSet<String> OPERATION_NAMES;
+/**
+ * 自定义Hook解析字段级血缘关系，输出到指定到文件中
+ * 配置在hive.exec.post.hooks，在执行计划之后会执行这个钩子函数解析血缘关系
+ * 可参考 官方到Demo org.apache.hadoop.hive.ql.hooks.LineageLogger
+ */
+public class LineageLoggerHook implements ExecuteWithHookContext {
     private static final String FORMAT_VERSION = "1.0";
-    
+    private static final HashSet<String> OPERATION_NAMES = new HashSet<>();
+
+    //目前只监控这几个操作，官方源码解析就这几个，如果特殊需要可以增加
+    static {
+        LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.QUERY.getOperationName());
+        LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATETABLE_AS_SELECT.getOperationName());
+        LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.ALTERVIEW_AS.getOperationName());
+        LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATEVIEW.getOperationName());
+    }
+
     @Override
     public void run(final HookContext hookContext) {
-        //这一步和官方的demo基本相似
+        //和配置文件相对应
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
+        //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
         final LineageCtx.Index index = hookContext.getIndex();
         final SessionState ss = SessionState.get();
+        //TODO 是不是这里把explain脚本过滤了，初始化可以不加，后面上线可以加上
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
                 //获取信息
                 String version = null;
+                //执行用户
                 String user = null;
                 String[] userGroupNames = null;
                 Long timestamp = null;
                 long duration = 0L;
+                //TODO 看看怎么ID可以从哪里获取
                 final List<String> jobIds = new ArrayList<>();
+                //执行引擎
                 String engine = null;
                 String database = null;
+                //HQL哈希值
                 String hash = null;
+                //HQL
                 String queryText = null;
                 final String queryStr = plan.getQueryStr().trim();
                 version = "1.0";
@@ -76,9 +95,11 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                     queryTime = System.currentTimeMillis();
                 }
                 duration = System.currentTimeMillis() - queryTime;
+                //TODO 这个UGI 是什么意思？在hadoop审计日志也有这个UGI，这个UGI还自带执行用户信息
                 user = hookContext.getUgi().getUserName();
                 userGroupNames = hookContext.getUgi().getGroupNames();
                 timestamp = queryTime / 1000L;
+                //TODO 这里可以拿到JobID，是不是任务初始化过程那里已经有的，在hook函数执行的时候已经传给Hook了
                 final List<TaskRunner> tasks = hookContext.getCompleteTaskList();
                 if (tasks != null && !tasks.isEmpty()) {
                     for (final TaskRunner task : tasks) {
@@ -88,12 +109,16 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                         }
                     }
                 }
+                //所以这个配置文件里面就有的，实际可以任务执行中来覆盖这个值
                 engine = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
                 database = MetaLogUtils.normalizeIdentifier(ss.getCurrentDatabase());
                 hash = DigestUtils.md5Hex(queryStr);
                 queryText = queryStr;
+                //TODO 我估摸着这个解法和官方处理最后得到edge是差不多的逻辑
                 final List<Edge> edges = this.getEdges(plan, index);
+                //根据edge获取表级血缘关系
                 final List<TableLineage> tableLineages = this.buildTableLineages(edges);
+                //根据edge获取字段级血缘关系
                 final List<ColumnLineage> columnLineages = this.buildColumnLineages(edges);
 
                 //消息设置
@@ -113,24 +138,30 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                 lhInfo.setColumnLineages(columnLineages);
 
                 //提交事件
-                final EventBase<LineageHookInfo> event = new EventBase<LineageHookInfo>();
+                final EventBase<LineageHookInfo> event = new EventBase<>();
                 event.setEventType("LINEAGE");
                 event.setContent(lhInfo);
                 event.setId(EventUtils.newId());
                 event.setTimestamp(System.currentTimeMillis());
                 event.setType("HIVE");
                 EventEmitterFactory.get().emit(event);
-            }
-            catch (Throwable t) {
+            } catch (Throwable t) {
                 this.log("Failed to log lineage graph, query is not affected\n" + StringUtils.stringifyException(t));
             }
         }
     }
-    
+
+    /**
+     * 解析原来的血缘
+     *
+     * @param plan  执行计划
+     * @param index 这个很神奇的玩意我不知道干嘛的，HOOK在执行前就被赋值来，我估计血缘信息在这里
+     * @return
+     */
     private List<Edge> getEdges(final QueryPlan plan, final LineageCtx.Index index) {
         final LinkedHashMap<String, ObjectPair<SelectOperator, Table>> finalSelOps = index.getFinalSelectOps();
-        final Map<String, Vertex> vertexCache = new LinkedHashMap<String, Vertex>();
-        final List<Edge> edges = new ArrayList<Edge>();
+        final Map<String, Vertex> vertexCache = new LinkedHashMap<>();
+        final List<Edge> edges = new ArrayList<>();
         for (final ObjectPair<SelectOperator, Table> pair : finalSelOps.values()) {
             List<FieldSchema> fieldSchemas = plan.getResultSchema().getFieldSchemas();
             final SelectOperator finalSelOp = pair.getFirst();
@@ -144,8 +175,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                 destPureTableName = t.getTableName();
                 destTableName = t.getDbName() + "." + t.getTableName();
                 fieldSchemas = t.getCols();
-            }
-            else {
+            } else {
                 for (final WriteEntity output : plan.getOutputs()) {
                     final Entity.Type entityType = output.getType();
                     if (entityType == Entity.Type.TABLE || entityType == Entity.Type.PARTITION) {
@@ -155,14 +185,14 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                         destTableName = t.getDbName() + "." + t.getTableName();
                         final List<FieldSchema> cols = t.getCols();
                         if (cols != null && !cols.isEmpty()) {
-                            colNames = (List<String>)Utilities.getColumnNamesFromFieldSchema((List)cols);
+                            colNames = (List<String>) Utilities.getColumnNamesFromFieldSchema((List) cols);
                             break;
                         }
                         break;
                     }
                 }
             }
-            final Map<ColumnInfo, LineageInfo.Dependency> colMap = (Map<ColumnInfo, LineageInfo.Dependency>)index.getDependencies((Operator)finalSelOp);
+            final Map<ColumnInfo, LineageInfo.Dependency> colMap = (Map<ColumnInfo, LineageInfo.Dependency>) index.getDependencies((Operator) finalSelOp);
             final List<LineageInfo.Dependency> dependencies = (colMap != null) ? new ArrayList<>(colMap.values()) : null;
             int fields = fieldSchemas.size();
             if (t != null && colMap != null && fields < colMap.size()) {
@@ -182,37 +212,42 @@ public class LineageLoggerHook implements ExecuteWithHookContext
             }
             if (dependencies == null || dependencies.size() != fields) {
                 this.log("Result schema has " + fields + " fields, but we don't get as many dependencies");
-            }
-            else {
-                final Set<Vertex> targets = new LinkedHashSet<Vertex>();
+            } else {
+                final Set<Vertex> targets = new LinkedHashSet<>();
                 for (int j = 0; j < fields; ++j) {
                     final Vertex target = this.getOrCreateVertex(vertexCache, this.getTargetFieldName(j, destTableName, colNames, fieldSchemas), Vertex.Type.COLUMN, destPureDbName, destPureTableName, this.getTargetPureFieldName(j, colNames, fieldSchemas));
                     targets.add(target);
                     final LineageInfo.Dependency dep = dependencies.get(j);
                     this.addEdge(vertexCache, edges, dep.getBaseCols(), target, dep.getExpr(), Edge.Type.PROJECTION);
                 }
-                final Set<LineageInfo.Predicate> conds = (Set<LineageInfo.Predicate>)index.getPredicates((Operator)finalSelOp);
+                final Set<LineageInfo.Predicate> conds = (Set<LineageInfo.Predicate>) index.getPredicates((Operator) finalSelOp);
                 if (conds == null || conds.isEmpty()) {
                     continue;
                 }
                 for (final LineageInfo.Predicate cond : conds) {
-                    this.addEdge(vertexCache, edges, cond.getBaseCols(), new LinkedHashSet<Vertex>(targets), cond.getExpr(), Edge.Type.PREDICATE);
+                    this.addEdge(vertexCache, edges, cond.getBaseCols(), new LinkedHashSet<>(targets), cond.getExpr(), Edge.Type.PREDICATE);
                 }
             }
         }
         return edges;
     }
-    
+
+    /**
+     * 表级血缘
+     *
+     * @param edges edge
+     * @return
+     */
     private List<TableLineage> buildTableLineages(final List<Edge> edges) {
-        final Set<TableLineage> tableLineages = new HashSet<TableLineage>();
+        final Set<TableLineage> tableLineages = new HashSet<>();
         for (final Edge edge : edges) {
-            final List<LineageTable> sources = new ArrayList<LineageTable>();
+            final List<LineageTable> sources = new ArrayList<>();
             for (final Vertex vertex : edge.sources) {
                 final String srcDatabase = MetaLogUtils.normalizeIdentifier(vertex.dbName);
                 final String srcTable = MetaLogUtils.normalizeIdentifier(vertex.tableName);
                 sources.add(new LineageTable(srcDatabase, srcTable));
             }
-            final List<LineageTable> targets = new ArrayList<LineageTable>();
+            final List<LineageTable> targets = new ArrayList<>();
             for (final Vertex vertex2 : edge.targets) {
                 final String destDatabase = MetaLogUtils.normalizeIdentifier(vertex2.dbName);
                 final String destTable = MetaLogUtils.normalizeIdentifier(vertex2.tableName);
@@ -233,23 +268,28 @@ public class LineageLoggerHook implements ExecuteWithHookContext
                 }
             }
         }
-        return new ArrayList<TableLineage>(tableLineages);
+        return new ArrayList<>(tableLineages);
     }
-    
+
+    /**
+     * 字段级血缘关系
+     * @param edges edge
+     * @return
+     */
     private List<ColumnLineage> buildColumnLineages(final List<Edge> edges) {
-        final List<ColumnLineage> columnLineages = new ArrayList<ColumnLineage>();
+        final List<ColumnLineage> columnLineages = new ArrayList<>();
         for (final Edge edge : edges) {
             String srcDatabase = null;
             String destDatabase = null;
             String expression = null;
             final Edge.Type edgeType = edge.type;
-            final List<LineageTableColumn> sources = new ArrayList<LineageTableColumn>();
+            final List<LineageTableColumn> sources = new ArrayList<>();
             for (final Vertex vertex : edge.sources) {
                 srcDatabase = MetaLogUtils.normalizeIdentifier(vertex.dbName);
                 final String srcTableName = MetaLogUtils.normalizeIdentifier(vertex.tableName);
                 sources.add(new LineageTableColumn(srcTableName, vertex.columnName));
             }
-            final List<LineageTableColumn> targets = new ArrayList<LineageTableColumn>();
+            final List<LineageTableColumn> targets = new ArrayList<>();
             for (final Vertex vertex2 : edge.targets) {
                 destDatabase = vertex2.dbName;
                 final String destTableName = MetaLogUtils.normalizeIdentifier(vertex2.tableName);
@@ -269,26 +309,25 @@ public class LineageLoggerHook implements ExecuteWithHookContext
         }
         return columnLineages;
     }
-    
+
     private void addEdge(final Map<String, Vertex> vertexCache, final List<Edge> edges, final Set<LineageInfo.BaseColumnInfo> srcCols, final Vertex target, final String expr, final Edge.Type type) {
-        final Set<Vertex> targets = new LinkedHashSet<Vertex>();
+        final Set<Vertex> targets = new LinkedHashSet<>();
         targets.add(target);
         this.addEdge(vertexCache, edges, srcCols, targets, expr, type);
     }
-    
+
     private void addEdge(final Map<String, Vertex> vertexCache, final List<Edge> edges, final Set<LineageInfo.BaseColumnInfo> srcCols, final Set<Vertex> targets, final String expr, final Edge.Type type) {
         final Set<Vertex> sources = this.createSourceVertices(vertexCache, srcCols);
         final Edge edge = this.findSimilarEdgeBySources(edges, sources, expr, type);
         if (edge == null) {
             edges.add(new Edge(sources, targets, expr, type));
-        }
-        else {
+        } else {
             edge.targets.addAll(targets);
         }
     }
-    
+
     private Set<Vertex> createSourceVertices(final Map<String, Vertex> vertexCache, final Collection<LineageInfo.BaseColumnInfo> baseCols) {
-        final Set<Vertex> sources = new LinkedHashSet<Vertex>();
+        final Set<Vertex> sources = new LinkedHashSet<>();
         if (baseCols != null && !baseCols.isEmpty()) {
             for (final LineageInfo.BaseColumnInfo col : baseCols) {
                 final org.apache.hadoop.hive.metastore.api.Table table = col.getTabAlias().getTable();
@@ -312,16 +351,16 @@ public class LineageLoggerHook implements ExecuteWithHookContext
         }
         return sources;
     }
-    
+
     private Edge findSimilarEdgeBySources(final List<Edge> edges, final Set<Vertex> sources, final String expr, final Edge.Type type) {
         for (final Edge edge : edges) {
-            if (edge.type == type && org.apache.commons.lang.StringUtils.equals(edge.expr, expr) && SetUtils.isEqualSet((Collection)edge.sources, (Collection)sources)) {
+            if (edge.type == type && org.apache.commons.lang.StringUtils.equals(edge.expr, expr) && SetUtils.isEqualSet((Collection) edge.sources, (Collection) sources)) {
                 return edge;
             }
         }
         return null;
     }
-    
+
     private String getTargetFieldName(final int fieldIndex, final String destTableName, final List<String> colNames, final List<FieldSchema> fieldSchemas) {
         final String fieldName = fieldSchemas.get(fieldIndex).getName();
         final String[] parts = fieldName.split("\\.");
@@ -337,7 +376,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext
         }
         return fieldName;
     }
-    
+
     private String getTargetPureFieldName(final int fieldIndex, final List<String> colNames, final List<FieldSchema> fieldSchemas) {
         final String fieldName = fieldSchemas.get(fieldIndex).getName();
         final String[] parts = fieldName.split("\\.");
@@ -350,7 +389,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext
         }
         return fieldName;
     }
-    
+
     private Vertex getOrCreateVertex(final Map<String, Vertex> vertices, final String label, final Vertex.Type type, final String dbName, final String tableName, final String columnName) {
         Vertex vertex = vertices.get(label);
         if (vertex == null) {
@@ -359,18 +398,11 @@ public class LineageLoggerHook implements ExecuteWithHookContext
         }
         return vertex;
     }
-    
+
     private void log(final String error) {
         final SessionState.LogHelper console = SessionState.getConsole();
         if (console != null) {
             console.printError(error);
         }
-    }
-    
-    static {
-        (OPERATION_NAMES = new HashSet<String>()).add(HiveOperation.QUERY.getOperationName());
-        LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATETABLE_AS_SELECT.getOperationName());
-        LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.ALTERVIEW_AS.getOperationName());
-        LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATEVIEW.getOperationName());
     }
 }
