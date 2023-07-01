@@ -35,6 +35,7 @@ import org.data.meta.hive.util.EventUtils;
 import org.data.meta.hive.util.MetaLogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.data.meta.hive.util.JsonUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -53,6 +54,8 @@ import java.util.Set;
 public class LineageLoggerHook implements ExecuteWithHookContext {
     private static final String FORMAT_VERSION = "1.0";
     private static final HashSet<String> OPERATION_NAMES = new HashSet<>();
+
+    private static final Logger LOG = LoggerFactory.getLogger(LineageLoggerHook.class);
 
     //目前只监控这几个操作，官方源码解析就这几个，如果特殊需要可以增加
     static {
@@ -98,6 +101,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 }
                 duration = System.currentTimeMillis() - queryTime;
                 //TODO 这个UGI是什么意思？在hadoop审计日志也有这个UGI，这个UGI还自带执行用户信息
+                //RetryingMetaStoreClient proxy=class org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClient ugi=hive/miniso-newpt2@MINISO-BDP-TEST.CN (auth:KERBEROS) retries=24 delay=5 lifetime=0
                 user = hookContext.getUgi().getUserName();
                 userGroupNames = hookContext.getUgi().getGroupNames();
                 timestamp = queryTime / 1000L;
@@ -262,11 +266,12 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                     final String srcTable2 = source.getTable();
                     final String destTable2 = target.getTable();
                     final TableLineage tableLineage = new TableLineage();
-                    tableLineage.setSrcDatabase(srcDatabase2);
-                    tableLineage.setDestDatabase(destDatabase2);
-                    tableLineage.setSrcTable(srcTable2);
-                    tableLineage.setDestTable(destTable2);
-                    tableLineages.add(tableLineage);
+                    tableLineage.setSrcTable(srcDatabase2 + "." + srcTable2);
+                    tableLineage.setDestTable(destDatabase2 + "." + destTable2);
+                    //不为空才添加
+                    if (destDatabase2 != null && destTable2 != null) {
+                        tableLineages.add(tableLineage);
+                    }
                 }
             }
         }
