@@ -81,6 +81,13 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         LOG.info(("========================================"));
         LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
         LOG.info(("========================================"));
+        LOG.info("hookContext.getUserName():" + hookContext.getUserName());
+        LOG.info(("========================================"));
+        LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
+        LOG.info(("========================================"));
+        LOG.info("HookContext"+JsonUtils.toJsonString(hookContext));
+        LOG.info(("========================================"));
+
 
         //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
         final LineageCtx.Index index = hookContext.getIndex();
