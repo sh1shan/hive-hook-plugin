@@ -85,7 +85,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         LOG.info(("========================================"));
         LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
         LOG.info(("========================================"));
-        LOG.info("HookContext"+JsonUtils.toJsonString(hookContext));
+        LOG.info("HookContext "+JsonUtils.toJsonString(hookContext));
         LOG.info(("========================================"));
 
 
