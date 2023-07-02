@@ -15,7 +15,8 @@ public class JsonEventCodec implements Codec {
             return null;
         } else {
             T content = event.getContent();
-            return content == null ? ("EVENT##" + event.getId() + "##" + event.getTimestamp() + "##" + event.getType() + "####").getBytes(StandardCharsets.UTF_8) : ("EVENT##" + event.getId() + "##" + event.getTimestamp() + "##" + event.getType() + "##" + content.getClass().getSimpleName() + "##" + JsonUtils.toJsonString(content)).getBytes(StandardCharsets.UTF_8);
+            return content == null ? ("EVENT##" + event.getId() + "##" + event.getTimestamp() + "##" + event.getType() + "####").getBytes(StandardCharsets.UTF_8)
+                    : ("EVENT##" + event.getId() + "##" + event.getTimestamp() + "##" + event.getType() + "##" + content.getClass().getSimpleName() + "##" + JsonUtils.toJsonString(content)).getBytes(StandardCharsets.UTF_8);
         }
     }
 }
