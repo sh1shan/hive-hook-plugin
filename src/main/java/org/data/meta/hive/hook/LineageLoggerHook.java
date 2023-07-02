@@ -48,7 +48,7 @@ import java.util.Set;
 
 /**
  * 自定义Hook解析字段级血缘关系，输出到指定到文件中
- * 配置在hive.exec.post.hooks，在执行计划之后会执行这个钩子函数解析血缘关系
+ * 配置在hive.exec.post.hooks，在返回用户结果前会执行这个钩子函数解析血缘关系
  * 可参考 官方到Demo org.apache.hadoop.hive.ql.hooks.LineageLogger
  */
 public class LineageLoggerHook implements ExecuteWithHookContext {
@@ -71,6 +71,17 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
+
+        LOG.info("==========================================");
+        LOG.info("JsonUtils.toJsonString(plan.getResultSchema()) :" + JsonUtils.toJsonString(plan.getResultSchema()));
+        LOG.info(("========================================"));
+        LOG.info("String.valueOf(plan.isExplain())):" + plan.isExplain());
+        LOG.info(("========================================"));
+        LOG.info("plan.getRootTasks().size(): " + plan.getRootTasks().size());
+        LOG.info(("========================================"));
+        LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
+        LOG.info(("========================================"));
+
         //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
         final LineageCtx.Index index = hookContext.getIndex();
         final SessionState ss = SessionState.get();
@@ -83,7 +94,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 String[] userGroupNames = null;
                 Long timestamp = null;
                 long duration = 0L;
-                //TODO 看看怎么ID可以从哪里获取
                 final List<String> jobIds = new ArrayList<>();
                 //执行引擎
                 String engine = null;
@@ -105,7 +115,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 user = hookContext.getUgi().getUserName();
                 userGroupNames = hookContext.getUgi().getGroupNames();
                 timestamp = queryTime / 1000L;
-                //TODO 这里可以拿到JobID，是不是任务初始化过程那里已经有的，在hook函数执行的时候已经传给Hook了
+                //因为该Hook是postHook，执行完才会被调用，HookContext会保存相关任务执行的信息
                 final List<TaskRunner> tasks = hookContext.getCompleteTaskList();
                 if (tasks != null && !tasks.isEmpty()) {
                     for (final TaskRunner task : tasks) {
@@ -166,12 +176,16 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
      */
     private List<Edge> getEdges(final QueryPlan plan, final LineageCtx.Index index) {
         final LinkedHashMap<String, ObjectPair<SelectOperator, Table>> finalSelOps = index.getFinalSelectOps();
+
         final Map<String, Vertex> vertexCache = new LinkedHashMap<>();
         final List<Edge> edges = new ArrayList<>();
+
         for (final ObjectPair<SelectOperator, Table> pair : finalSelOps.values()) {
             List<FieldSchema> fieldSchemas = plan.getResultSchema().getFieldSchemas();
+
             final SelectOperator finalSelOp = pair.getFirst();
             Table t = pair.getSecond();
+
             String destPureDbName = null;
             String destPureTableName = null;
             String destTableName = null;
@@ -268,7 +282,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                     final TableLineage tableLineage = new TableLineage();
                     tableLineage.setSrcTable(srcDatabase2 + "." + srcTable2);
                     tableLineage.setDestTable(destDatabase2 + "." + destTable2);
-                    //不为空才添加
+                    //TODO 还需要再进一步验证，不为空才添加
                     if (destDatabase2 != null && destTable2 != null) {
                         tableLineages.add(tableLineage);
                     }
@@ -287,21 +301,21 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
     private List<ColumnLineage> buildColumnLineages(final List<Edge> edges) {
         final List<ColumnLineage> columnLineages = new ArrayList<>();
         for (final Edge edge : edges) {
-            String srcDatabase = null;
-            String destDatabase = null;
+            String srcDatabase = "default";
+            String destDatabase = "default";
             String expression = null;
             final Edge.Type edgeType = edge.type;
             final List<LineageTableColumn> sources = new ArrayList<>();
             for (final Vertex vertex : edge.sources) {
                 srcDatabase = MetaLogUtils.normalizeIdentifier(vertex.dbName);
                 final String srcTableName = MetaLogUtils.normalizeIdentifier(vertex.tableName);
-                sources.add(new LineageTableColumn(srcTableName, vertex.columnName));
+                sources.add(new LineageTableColumn(srcDatabase + "." + srcTableName, vertex.columnName));
             }
             final List<LineageTableColumn> targets = new ArrayList<>();
             for (final Vertex vertex2 : edge.targets) {
                 destDatabase = vertex2.dbName;
                 final String destTableName = MetaLogUtils.normalizeIdentifier(vertex2.tableName);
-                targets.add(new LineageTableColumn(destTableName, vertex2.columnName));
+                targets.add(new LineageTableColumn(destDatabase + "." + destTableName, vertex2.columnName));
             }
             if (edge.expr != null) {
                 expression = edge.expr;
@@ -309,11 +323,13 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
             final ColumnLineage columnLineage = new ColumnLineage();
             columnLineage.setEdgeType(edgeType);
             columnLineage.setExpression(expression);
-            columnLineage.setSrcDatabase(srcDatabase);
-            columnLineage.setDestDatabase(destDatabase);
             columnLineage.setSources(sources);
             columnLineage.setTargets(targets);
-            columnLineages.add(columnLineage);
+            //TODO 对于没有source的字段，这边过滤掉
+            //TODO 我只要 PROJECTION 不要 PREDICATE，如果需要可以去掉这个判断，两个都打印出来
+            if (sources.size() != 0 && edgeType == Edge.Type.PROJECTION) {
+                columnLineages.add(columnLineage);
+            }
         }
         return columnLineages;
     }
