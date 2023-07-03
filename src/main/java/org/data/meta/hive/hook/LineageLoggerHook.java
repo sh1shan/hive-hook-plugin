@@ -87,9 +87,9 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         LOG.info("plan.getRootTasks().size(): " + plan.getRootTasks().size());
         LOG.info(("========================================"));  //class org.apache.hadoop.hive.ql.exec.tez.TezTask
         LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
-        LOG.info(("========================================")); //hue
+        LOG.info(("========================================")); //hue 提交任务的用户
         LOG.info("hookContext.getUserName():" + hookContext.getUserName());
-        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN
+        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN 任务执行的用户
         LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
         LOG.info(("========================================"));
 
@@ -99,7 +99,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         final SessionState ss = SessionState.get();
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
-                //执行用户
+                //
                 String user = null;
                 String[] userGroupNames = null;
                 Long timestamp = null;
