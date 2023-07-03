@@ -1,9 +1,9 @@
 package org.data.meta.hive.service.notification;
 
-import java.util.List;
 
 import org.data.meta.hive.exceptions.NotificationException;
 
+import java.util.List;
 
 /**
  * @author chenchaolin

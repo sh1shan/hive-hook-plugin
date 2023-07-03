@@ -30,7 +30,9 @@ import org.data.meta.hive.model.lineage.LineageTable;
 import org.data.meta.hive.model.lineage.LineageTableColumn;
 import org.data.meta.hive.model.lineage.TableLineage;
 import org.data.meta.hive.model.lineage.Vertex;
-import org.data.meta.hive.service.emitter.EventEmitterFactory;
+import org.data.meta.hive.service.codec.EventCodecs;
+import org.data.meta.hive.service.notification.NotificationInterface;
+import org.data.meta.hive.service.notification.NotificationProvider;
 import org.data.meta.hive.util.EventUtils;
 import org.data.meta.hive.util.MetaLogUtils;
 import org.slf4j.Logger;
@@ -56,36 +58,39 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
     private static final HashSet<String> OPERATION_NAMES = new HashSet<>();
 
     private static final Logger LOG = LoggerFactory.getLogger(LineageLoggerHook.class);
+    protected static NotificationInterface notificationInterface;
 
-    //目前只监控这几个操作，官方源码解析就这几个，如果特殊需要可以增加
+
     static {
+        //目前只监控这几个Hook Type，官方源码解析就这几个，如果特殊需要可以增加
         LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.QUERY.getOperationName());
         LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATETABLE_AS_SELECT.getOperationName());
         LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.ALTERVIEW_AS.getOperationName());
         LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATEVIEW.getOperationName());
+
+        //kafka相关
+        notificationInterface = NotificationProvider.get();
     }
 
     @Override
     public void run(final HookContext hookContext) {
-        //和配置文件相对应
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
 
+
         LOG.info("==========================================");
         LOG.info("JsonUtils.toJsonString(plan.getResultSchema()) :" + JsonUtils.toJsonString(plan.getResultSchema()));
-        LOG.info(("========================================"));
+        LOG.info(("========================================")); //实际执行是：false，带上explain：true
         LOG.info("String.valueOf(plan.isExplain())):" + plan.isExplain());
-        LOG.info(("========================================"));
+        LOG.info(("========================================"));//1
         LOG.info("plan.getRootTasks().size(): " + plan.getRootTasks().size());
-        LOG.info(("========================================"));
+        LOG.info(("========================================"));  //class org.apache.hadoop.hive.ql.exec.tez.TezTask
         LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
-        LOG.info(("========================================"));
+        LOG.info(("========================================")); //hue
         LOG.info("hookContext.getUserName():" + hookContext.getUserName());
-        LOG.info(("========================================"));
+        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN
         LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
-        LOG.info(("========================================"));
-        LOG.info("HookContext "+JsonUtils.toJsonString(hookContext));
         LOG.info(("========================================"));
 
 
@@ -94,23 +99,17 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         final SessionState ss = SessionState.get();
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
-                //获取信息
-                String version = null;
                 //执行用户
                 String user = null;
                 String[] userGroupNames = null;
                 Long timestamp = null;
                 long duration = 0L;
                 final List<String> jobIds = new ArrayList<>();
-                //执行引擎
                 String engine = null;
                 String database = null;
-                //HQL哈希值
                 String hash = null;
-                //HQL
                 String queryText = null;
                 final String queryStr = plan.getQueryStr().trim();
-                version = "1.0";
                 final HiveConf conf = ss.getConf();
                 long queryTime = plan.getQueryStartTime();
                 if (queryTime == 0L) {
@@ -137,7 +136,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 database = MetaLogUtils.normalizeIdentifier(ss.getCurrentDatabase());
                 hash = DigestUtils.md5Hex(queryStr);
                 queryText = queryStr;
-                //TODO 我估摸着这个解法和官方处理最后得到edge是差不多的逻辑
                 final List<Edge> edges = this.getEdges(plan, index);
                 //根据edge获取表级血缘关系
                 final List<TableLineage> tableLineages = this.buildTableLineages(edges);
@@ -156,18 +154,24 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 lhInfo.setTimestamp(timestamp);
                 lhInfo.setUser(user);
                 lhInfo.setUserGroupNames(userGroupNames);
-                lhInfo.setVersion(version);
+                lhInfo.setVersion(FORMAT_VERSION);
                 lhInfo.setTableLineages(tableLineages);
                 lhInfo.setColumnLineages(columnLineages);
 
-                //提交事件
+                //提交message到kafka
                 final EventBase<LineageHookInfo> event = new EventBase<>();
                 event.setEventType("LINEAGE");
                 event.setContent(lhInfo);
                 event.setId(EventUtils.newId());
                 event.setTimestamp(System.currentTimeMillis());
                 event.setType("HIVE");
-                EventEmitterFactory.get().emit(event);
+                //不采用这种方式单独将message信息重新写出到其他日志文件
+                //EventEmitterFactory.get().emit(event);
+                String message = new String(EventCodecs.encode(event));
+                //TODO 不是所有的消息都往kafka发的，可以做一个判断
+                LOG.info("开始发送消息");
+                notificationInterface.send(message);
+                LOG.info("发送消息完毕");
             } catch (Throwable t) {
                 this.log("Failed to log lineage graph, query is not affected\n" + StringUtils.stringifyException(t));
             }

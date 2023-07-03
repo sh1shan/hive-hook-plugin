@@ -1,7 +1,5 @@
 package org.data.meta.hive.service.notification;
 
-import org.apache.commons.configuration2.Configuration;
-import org.data.meta.hive.ApplicationProperties;
 
 /**
  * @author chenchaolin
@@ -12,8 +10,7 @@ public class NotificationProvider {
 
     public static KafkaNotification get() {
         if (kafkaNotification == null) {
-            Configuration applicationProperties = ApplicationProperties.get();
-            kafkaNotification = new KafkaNotification(applicationProperties);
+            kafkaNotification = new KafkaNotification();
         }
         return kafkaNotification;
     }

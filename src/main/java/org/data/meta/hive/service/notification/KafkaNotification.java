@@ -1,10 +1,6 @@
 package org.data.meta.hive.service.notification;
 
-import com.sun.jersey.spi.inject.Inject;
-import org.apache.commons.configuration2.Configuration;
-import org.apache.commons.configuration2.ConfigurationConverter;
 import org.apache.commons.lang.StringUtils;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.*;
 import org.data.meta.hive.exceptions.NotificationException;
 import org.slf4j.Logger;
@@ -27,30 +23,26 @@ public class KafkaNotification extends AbstractNotification {
 
     public static final String HOOK_TOPIC = "TOPIC_METADATA_LINEAGE";
     private final Properties properties;
+    private KafkaProducer<String, String> producer;
 
     /**
      * Construct a KafkaNotification.
-     *
-     * @param applicationProperties the application properties used to configure Kafka
      */
-    @Inject
-    public KafkaNotification(Configuration applicationProperties) {
-        super(applicationProperties);
+    public KafkaNotification() {
+        properties = new Properties();
 
-        properties = ConfigurationConverter.getProperties(applicationProperties);
+        properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "10.231.3.123:6667,10.231.3.124:6667,10.231.3.125:6667");
 
-        // Override default configs
         properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
         properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
-        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
-        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
-        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        properties.put("enable.auto.commit", applicationProperties.getBoolean("enable.auto.commit", false));
-        properties.put("session.timeout.ms", applicationProperties.getString("session.timeout.ms", "30000"));
+
+        properties.put(ProducerConfig.ACKS_CONFIG, "all");
+        properties.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 33554432);
+        properties.put(ProducerConfig.RETRIES_CONFIG, 0);
+        properties.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 300);
+        properties.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
     }
 
-
-    private KafkaProducer<String, String> producer;
 
     @Override
     protected void sendInternal(List<String> messages) {
@@ -71,19 +63,22 @@ public class KafkaNotification extends AbstractNotification {
     }
 
     void sendInternalToProducer(Producer<String, String> p, List<String> messages) {
+        //往kafka发消息callback的message信息
         List<MessageContext> messageContexts = new ArrayList<>();
 
         for (String message : messages) {
             if (StringUtils.isNotBlank(message)) {
-                ProducerRecord<String, String> record =
-                        new ProducerRecord<>(HOOK_TOPIC, message);
+                ProducerRecord<String, String> record = new ProducerRecord<>(HOOK_TOPIC, message);
 
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Sending message for topic {}: {}", HOOK_TOPIC, message);
-                }
+//                if (LOG.isDebugEnabled()) {
+//                    LOG.debug("Sending message for topic {}: {}", HOOK_TOPIC, message);
+//                }
+                LOG.info("Sending message for topic {}: {}", HOOK_TOPIC, message);
 
+                //往kafka推消息，这里没用带callback的方法,发完再统一处理
                 Future<RecordMetadata> future = p.send(record);
 
+                //收集发送到kafka的message的回调信息
                 messageContexts.add(new MessageContext(future, message));
             }
         }
@@ -91,17 +86,18 @@ public class KafkaNotification extends AbstractNotification {
         List<String> failedMessages = new ArrayList<>();
         Exception lastFailureException = null;
 
+        //处理发送到kafka的message的回调信息
         for (MessageContext context : messageContexts) {
             try {
                 RecordMetadata response = context.getFuture().get();
 
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Sent message for topic - {}, partition - {}, offset - {}",
-                            response.topic(), response.partition(), response.offset());
-                }
+//                if (LOG.isDebugEnabled()) {
+//                    LOG.debug("Sent message for topic - {}, partition - {}, offset - {}", response.topic(), response.partition(), response.offset());
+//                }
+                LOG.info("Sent message for topic - {}, partition - {}, offset - {}", response.topic(), response.partition(), response.offset());
             } catch (Exception e) {
                 lastFailureException = e;
-
+                //失败信息
                 failedMessages.add(context.getMessage());
             }
         }
@@ -109,14 +105,22 @@ public class KafkaNotification extends AbstractNotification {
         if (lastFailureException != null) {
             throw new NotificationException(lastFailureException, failedMessages);
         }
+        //关闭客户端
+        close();
     }
 
+    /**
+     * kafka 生产者
+     */
     private synchronized void createProducer() {
         if (producer == null) {
             producer = new KafkaProducer<>(properties);
         }
     }
 
+    /**
+     * 发送到kafka的message的回调信息
+     */
     private static class MessageContext {
         private final Future<RecordMetadata> future;
         private final String message;

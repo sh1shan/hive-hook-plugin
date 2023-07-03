@@ -1,11 +1,12 @@
 package org.data.meta.hive.service.notification;
 
+
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.configuration2.Configuration;
+import org.data.meta.hive.exceptions.NotificationException;
 
 import java.util.Arrays;
 import java.util.List;
-import org.data.meta.hive.exceptions.NotificationException;
 
 /**
  * @author chenchaolin
