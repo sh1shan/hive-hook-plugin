@@ -71,7 +71,9 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
 
         //kafka相关
         try {
-            notificationInterface = new KafkaNotification();
+            if (notificationInterface == null) {
+                notificationInterface = new KafkaNotification();
+            }
         } catch (LoginException e) {
             e.printStackTrace();
         }
@@ -110,7 +112,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 long duration = 0L;
                 final List<String> jobIds = new ArrayList<>();
                 String engine = null;
-                String database = null;
                 String hash = null;
                 String queryText = null;
                 final String queryStr = plan.getQueryStr().trim();
@@ -137,7 +138,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 }
                 //所以这个配置文件里面就有的，实际可以任务执行中来覆盖这个值
                 engine = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
-                database = MetaLogUtils.normalizeIdentifier(ss.getCurrentDatabase());
                 hash = DigestUtils.md5Hex(queryStr);
                 queryText = queryStr;
                 final List<Edge> edges = this.getEdges(plan, index);
@@ -149,7 +149,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 //消息设置
                 final LineageHookInfo lhInfo = new LineageHookInfo();
                 lhInfo.setConf(hookContext.getConf().get("dw_output"));
-                lhInfo.setDatabase(database);
                 lhInfo.setDuration(duration);
                 lhInfo.setEngine(engine);
                 lhInfo.setHash(hash);
