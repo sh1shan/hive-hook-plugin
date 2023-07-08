@@ -31,14 +31,15 @@ import org.data.meta.hive.model.lineage.LineageTableColumn;
 import org.data.meta.hive.model.lineage.TableLineage;
 import org.data.meta.hive.model.lineage.Vertex;
 import org.data.meta.hive.service.codec.EventCodecs;
+import org.data.meta.hive.service.notification.KafkaNotification;
 import org.data.meta.hive.service.notification.NotificationInterface;
-import org.data.meta.hive.service.notification.NotificationProvider;
 import org.data.meta.hive.util.EventUtils;
 import org.data.meta.hive.util.MetaLogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.data.meta.hive.util.JsonUtils;
 
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -69,29 +70,32 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATEVIEW.getOperationName());
 
         //kafka相关
-        notificationInterface = NotificationProvider.get();
+        try {
+            notificationInterface = new KafkaNotification();
+        } catch (LoginException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
-    public void run(final HookContext hookContext) {
+    public void run(final HookContext hookContext) throws IOException, LoginException {
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
 
-
-        LOG.info("==========================================");
-        LOG.info("JsonUtils.toJsonString(plan.getResultSchema()) :" + JsonUtils.toJsonString(plan.getResultSchema()));
-        LOG.info(("========================================")); //实际执行是：false，带上explain：true
-        LOG.info("String.valueOf(plan.isExplain())):" + plan.isExplain());
-        LOG.info(("========================================"));//1
-        LOG.info("plan.getRootTasks().size(): " + plan.getRootTasks().size());
-        LOG.info(("========================================"));  //class org.apache.hadoop.hive.ql.exec.tez.TezTask
-        LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
-        LOG.info(("========================================")); //hue
-        LOG.info("hookContext.getUserName():" + hookContext.getUserName());
-        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN
-        LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
-        LOG.info(("========================================"));
+//        LOG.info("==========================================");
+//        LOG.info("JsonUtils.toJsonString(plan.getResultSchema()) :" + JsonUtils.toJsonString(plan.getResultSchema()));
+//        LOG.info(("========================================")); //实际执行是：false，带上explain：true
+//        LOG.info("String.valueOf(plan.isExplain())):" + plan.isExplain());
+//        LOG.info(("========================================"));//1
+//        LOG.info("plan.getRootTasks().size(): " + plan.getRootTasks().size());
+//        LOG.info(("========================================"));  //class org.apache.hadoop.hive.ql.exec.tez.TezTask
+//        LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
+//        LOG.info(("========================================")); //hue
+//        LOG.info("hookContext.getUserName():" + hookContext.getUserName());
+//        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN
+//        LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
+//        LOG.info(("========================================"));
 
 
         //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文

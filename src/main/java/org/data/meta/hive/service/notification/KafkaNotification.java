@@ -6,6 +6,9 @@ import org.data.meta.hive.exceptions.NotificationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.login.Configuration;
+import javax.security.auth.login.LoginContext;
+import javax.security.auth.login.LoginException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -28,7 +31,12 @@ public class KafkaNotification extends AbstractNotification {
     /**
      * Construct a KafkaNotification.
      */
-    public KafkaNotification() {
+    public KafkaNotification() throws LoginException {
+        //Kerberos认证
+        Configuration.setConfiguration(new JaasConfiguration());
+        LoginContext loginContext = new LoginContext("KafkaClient");
+        loginContext.login();
+
         properties = new Properties();
 
         properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "10.231.3.123:6667,10.231.3.124:6667,10.231.3.125:6667");
@@ -41,6 +49,11 @@ public class KafkaNotification extends AbstractNotification {
         properties.put(ProducerConfig.RETRIES_CONFIG, 0);
         properties.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 300);
         properties.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
+
+        // 设置Kerberos相关的配置
+        properties.put("security.protocol", "SASL_PLAINTEXT");
+        properties.put("sasl.mechanism", "GSSAPI");
+        properties.put("sasl.kerberos.service.name", "kafka");
     }
 
 
