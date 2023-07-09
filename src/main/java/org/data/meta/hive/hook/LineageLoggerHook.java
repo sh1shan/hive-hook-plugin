@@ -296,7 +296,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                     final TableLineage tableLineage = new TableLineage();
                     tableLineage.setSrcTable(srcDatabase2 + "." + srcTable2);
                     tableLineage.setDestTable(destDatabase2 + "." + destTable2);
-                    //TODO 还需要再进一步验证，不为空才添加
                     if (destDatabase2 != null && destTable2 != null) {
                         tableLineages.add(tableLineage);
                     }
