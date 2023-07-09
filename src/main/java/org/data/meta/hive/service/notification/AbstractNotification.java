@@ -19,11 +19,7 @@ public abstract class AbstractNotification implements NotificationInterface {
      */
     public static final int MAX_BYTES_PER_CHAR = 4;
 
-    public AbstractNotification(Configuration applicationProperties) {
-    }
-
-    @VisibleForTesting
-    protected AbstractNotification() {
+    public AbstractNotification() {
     }
 
     @Override
