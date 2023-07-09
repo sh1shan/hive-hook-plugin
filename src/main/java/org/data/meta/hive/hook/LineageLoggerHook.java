@@ -121,8 +121,8 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                     queryTime = System.currentTimeMillis();
                 }
                 duration = System.currentTimeMillis() - queryTime;
-                //TODO 这个UGI是什么意思？在hadoop审计日志也有这个UGI，这个UGI还自带执行用户信息
-                //RetryingMetaStoreClient proxy=class org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClient ugi=hive/miniso-newpt2@MINISO-BDP-TEST.CN (auth:KERBEROS) retries=24 delay=5 lifetime=0
+                //TODO UGI自带执行用户信息，执行计划中还有提交用户的信息，可自行判断取哪个用户
+                //RetryingMetaStoreClient proxy=class org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClient ugi=hive/xxxx-newpt2@XXXX-BDP-TEST.CN (auth:KERBEROS) retries=24 delay=5 lifetime=0
                 user = hookContext.getUgi().getUserName();
                 userGroupNames = hookContext.getUgi().getGroupNames();
                 timestamp = queryTime / 1000L;
@@ -182,10 +182,10 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
     }
 
     /**
-     * 解析原来的血缘
+     * 解析Hive的血缘
      *
      * @param plan  执行计划
-     * @param index org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
+     * @param index org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘上下文
      * @return
      */
     private List<Edge> getEdges(final QueryPlan plan, final LineageCtx.Index index) {
