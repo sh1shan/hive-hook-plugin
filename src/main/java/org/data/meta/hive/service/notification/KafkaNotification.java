@@ -1,7 +1,9 @@
 package org.data.meta.hive.service.notification;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.config.SaslConfigs;
 import org.data.meta.hive.exceptions.NotificationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,9 +53,9 @@ public class KafkaNotification extends AbstractNotification {
         properties.put(ProducerConfig.BATCH_SIZE_CONFIG, 16384);
 
         // 设置Kerberos相关的配置
-        properties.put("security.protocol", "SASL_PLAINTEXT");
-        properties.put("sasl.mechanism", "GSSAPI");
-        properties.put("sasl.kerberos.service.name", "kafka");
+        properties.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_PLAINTEXT");
+        properties.put(SaslConfigs.SASL_MECHANISM, "GSSAPI");
+        properties.put(SaslConfigs.SASL_KERBEROS_SERVICE_NAME, "kafka");
     }
 
 
