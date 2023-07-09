@@ -31,14 +31,15 @@ import org.data.meta.hive.model.lineage.LineageTableColumn;
 import org.data.meta.hive.model.lineage.TableLineage;
 import org.data.meta.hive.model.lineage.Vertex;
 import org.data.meta.hive.service.codec.EventCodecs;
+import org.data.meta.hive.service.notification.KafkaNotification;
 import org.data.meta.hive.service.notification.NotificationInterface;
-import org.data.meta.hive.service.notification.NotificationProvider;
 import org.data.meta.hive.util.EventUtils;
 import org.data.meta.hive.util.MetaLogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.data.meta.hive.util.JsonUtils;
 
+import javax.security.auth.login.LoginException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -69,29 +70,34 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         LineageLoggerHook.OPERATION_NAMES.add(HiveOperation.CREATEVIEW.getOperationName());
 
         //kafka相关
-        notificationInterface = NotificationProvider.get();
+        try {
+            if (notificationInterface == null) {
+                notificationInterface = new KafkaNotification();
+            }
+        } catch (LoginException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
-    public void run(final HookContext hookContext) {
+    public void run(final HookContext hookContext) throws IOException, LoginException {
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
 
-
-        LOG.info("==========================================");
-        LOG.info("JsonUtils.toJsonString(plan.getResultSchema()) :" + JsonUtils.toJsonString(plan.getResultSchema()));
-        LOG.info(("========================================")); //实际执行是：false，带上explain：true
-        LOG.info("String.valueOf(plan.isExplain())):" + plan.isExplain());
-        LOG.info(("========================================"));//1
-        LOG.info("plan.getRootTasks().size(): " + plan.getRootTasks().size());
-        LOG.info(("========================================"));  //class org.apache.hadoop.hive.ql.exec.tez.TezTask
-        LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
-        LOG.info(("========================================")); //hue 提交任务的用户
-        LOG.info("hookContext.getUserName():" + hookContext.getUserName());
-        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN 任务执行的用户
-        LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
-        LOG.info(("========================================"));
+//        LOG.info("==========================================");
+//        LOG.info("JsonUtils.toJsonString(plan.getResultSchema()) :" + JsonUtils.toJsonString(plan.getResultSchema()));
+//        LOG.info(("========================================")); //实际执行是：false，带上explain：true
+//        LOG.info("String.valueOf(plan.isExplain())):" + plan.isExplain());
+//        LOG.info(("========================================"));//1
+//        LOG.info("plan.getRootTasks().size(): " + plan.getRootTasks().size());
+//        LOG.info(("========================================"));  //class org.apache.hadoop.hive.ql.exec.tez.TezTask
+//        LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
+//        LOG.info(("========================================")); //hue
+//        LOG.info("hookContext.getUserName():" + hookContext.getUserName());
+//        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN
+//        LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
+//        LOG.info(("========================================"));
 
 
         //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
@@ -99,14 +105,13 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         final SessionState ss = SessionState.get();
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
-                //
+                //执行用户
                 String user = null;
                 String[] userGroupNames = null;
                 Long timestamp = null;
                 long duration = 0L;
                 final List<String> jobIds = new ArrayList<>();
                 String engine = null;
-                String database = null;
                 String hash = null;
                 String queryText = null;
                 final String queryStr = plan.getQueryStr().trim();
@@ -133,7 +138,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 }
                 //所以这个配置文件里面就有的，实际可以任务执行中来覆盖这个值
                 engine = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
-                database = MetaLogUtils.normalizeIdentifier(ss.getCurrentDatabase());
                 hash = DigestUtils.md5Hex(queryStr);
                 queryText = queryStr;
                 final List<Edge> edges = this.getEdges(plan, index);
@@ -145,7 +149,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 //消息设置
                 final LineageHookInfo lhInfo = new LineageHookInfo();
                 lhInfo.setConf(hookContext.getConf().get("dw_output"));
-                lhInfo.setDatabase(database);
                 lhInfo.setDuration(duration);
                 lhInfo.setEngine(engine);
                 lhInfo.setHash(hash);
