@@ -14,7 +14,7 @@ public class LineageHookInfo {
     private String[] userGroupNames;
     private String version;
     private List<ColumnLineage> columnLineages;
-    private List<TableLineage> tableLineages;
+    private TableLineage tableLineage;
     private String conf;
 
     public LineageHookInfo() {
@@ -108,12 +108,12 @@ public class LineageHookInfo {
         this.columnLineages = columnLineages;
     }
 
-    public List<TableLineage> getTableLineages() {
-        return this.tableLineages;
+    public TableLineage getTableLineage() {
+        return this.tableLineage;
     }
 
-    public void setTableLineages(List<TableLineage> tableLineages) {
-        this.tableLineages = tableLineages;
+    public void setTableLineage(TableLineage tableLineage) {
+        this.tableLineage = tableLineage;
     }
 
     public String getConf() {

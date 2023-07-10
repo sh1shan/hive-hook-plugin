@@ -142,7 +142,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 queryText = queryStr;
                 final List<Edge> edges = this.getEdges(plan, index);
                 //根据edge获取表级血缘关系
-                final List<TableLineage> tableLineages = this.buildTableLineages(edges);
+                final TableLineage tableLineage = this.buildTableLineages(edges);
                 //根据edge获取字段级血缘关系
                 final List<ColumnLineage> columnLineages = this.buildColumnLineages(edges);
 
@@ -158,7 +158,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 lhInfo.setUser(user);
                 lhInfo.setUserGroupNames(userGroupNames);
                 lhInfo.setVersion(FORMAT_VERSION);
-                lhInfo.setTableLineages(tableLineages);
+                lhInfo.setTableLineage(tableLineage);
                 lhInfo.setColumnLineages(columnLineages);
 
                 //提交message到kafka
@@ -272,8 +272,10 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
      * @param edges edge
      * @return
      */
-    private List<TableLineage> buildTableLineages(final List<Edge> edges) {
-        final Set<TableLineage> tableLineages = new HashSet<>();
+    private TableLineage buildTableLineages(final List<Edge> edges) {
+        TableLineage tableLineage = new TableLineage();
+        final Set<String> srcTables = new HashSet<>();
+        final Set<String> destTables = new HashSet<>();
         for (final Edge edge : edges) {
             final List<LineageTable> sources = new ArrayList<>();
             for (final Vertex vertex : edge.sources) {
@@ -293,16 +295,16 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                     final String destDatabase2 = target.getDatabase();
                     final String srcTable2 = source.getTable();
                     final String destTable2 = target.getTable();
-                    final TableLineage tableLineage = new TableLineage();
-                    tableLineage.setSrcTable(srcDatabase2 + "." + srcTable2);
-                    tableLineage.setDestTable(destDatabase2 + "." + destTable2);
                     if (destDatabase2 != null && destTable2 != null) {
-                        tableLineages.add(tableLineage);
+                        srcTables.add(srcDatabase2 + "." + srcTable2);
+                        destTables.add(destDatabase2 + "." + destTable2);
                     }
                 }
             }
         }
-        return new ArrayList<>(tableLineages);
+        tableLineage.setSrcTable(new ArrayList<>(srcTables));
+        tableLineage.setDestTable(new ArrayList<>(destTables));
+        return tableLineage;
     }
 
     /**
@@ -328,7 +330,10 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
             for (final Vertex vertex2 : edge.targets) {
                 destDatabase = vertex2.dbName;
                 final String destTableName = MetaLogUtils.normalizeIdentifier(vertex2.tableName);
-                targets.add(new LineageTableColumn(destDatabase + "." + destTableName, vertex2.columnName));
+                //对于target column是_col开头的字段我们这边需要剔除
+                if (!vertex2.columnName.startsWith("_col")) {
+                    targets.add(new LineageTableColumn(destDatabase + "." + destTableName, vertex2.columnName));
+                }
             }
             if (edge.expr != null) {
                 expression = edge.expr;
@@ -340,7 +345,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
             columnLineage.setTargets(targets);
             //TODO 对于没有source的字段，这边过滤掉
             //TODO 我只要 PROJECTION 不要 PREDICATE，如果需要可以去掉这个判断，两个都打印出来
-            if (sources.size() != 0 && edgeType == Edge.Type.PROJECTION) {
+            if (sources.size() != 0 && edgeType == Edge.Type.PROJECTION && targets.size() !=0) {
                 columnLineages.add(columnLineage);
             }
         }

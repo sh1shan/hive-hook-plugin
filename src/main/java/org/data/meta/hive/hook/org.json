@@ -1,0 +1,3281 @@
+{
+  "database": "dim",
+  "duration": 18242,
+  "engine": "tez",
+  "hash": "254e071573b3f918d178eed6135115ef",
+  "jobIds": [],
+  "queryText": "with tmp0 as (\r\nselect\r\n    a.ds,\r\n    a.prod_id as sku_code,\r\n    a.sap_store_code,\r\n    a.stock_prod_qty_1d_ste,\r\n    a.stock_prod_qty_1d_stb,\r\n    0 as sale_qty\r\nfrom ads.ads_scm_store_jxcrpt_1d a\r\nleft join dim.dim_store_info_lastest t1 on a.sap_store_code\u003dt1.sap_store_code\r\nwhere a.ds \u003e date_sub(\u00272021-05-08\u0027,28) and  a.ds \u003c\u003d \u00272021-05-08\u0027 and t1.sts_state \u003d \u00273A\u0027\r\nunion all\r\nselect\r\n        a.ds,\r\n        a.sku_code,\r\n        a.sap_store_code ,\r\n        0 as stock_prod_qty_1d_ste ,\r\n        0 as stock_prod_qty_1d_stb ,\r\n        a.sale_qty\r\n    from dwd.dws_rpt_store_goods_sale_query_df a\r\n    left join dim.dim_store_info_lastest t1 on a.sap_store_code\u003dt1.sap_store_code\r\n    where a.ds \u003e date_sub(\u00272021-05-08\u0027,28) and  a.ds \u003c\u003d \u00272021-05-08\u0027 and t1.sts_state \u003d \u00273A\u0027\r\n)\r\n,\r\ntmp as(\r\n    select\r\n           a.sku_code,\r\n           a.sap_store_code,\r\n           count(case when stock_prod_qty_1d_ste \u003e 0 and stock_prod_qty_1d_stb \u003e 0 and ds \u003e date_sub(\u00272021-05-08\u0027,7) then a.sap_store_code end ) as store_day_7,     --近7天符合条件门店数 --日均销门店数\r\n           count(case when stock_prod_qty_1d_ste \u003e 0 and stock_prod_qty_1d_stb \u003e 0 and ds \u003e date_sub(\u00272021-05-08\u0027,28) then a.sap_store_code end) as store_day_28,    --近28天符合条件门店数 --日均销门店数\r\n           sum(case when stock_prod_qty_1d_ste \u003e 0 and stock_prod_qty_1d_stb \u003e 0 and ds \u003e date_sub(\u00272021-05-08\u0027,7) then a.sale_qty else 0 end) as sale_qty_7,  --近七天符合条件销售数量  --日均销销量\r\n           sum(case when stock_prod_qty_1d_ste \u003e 0 and stock_prod_qty_1d_stb \u003e 0 and ds \u003e date_sub(\u00272021-05-08\u0027,28) then a.sale_qty else 0 end) as sale_qty_28  --近28天符合条件销售数量  --日均销销量\r\n    from (\r\n        select\r\n               ds,\r\n               sku_code,\r\n               sap_store_code,\r\n               sum(stock_prod_qty_1d_ste) as stock_prod_qty_1d_ste,\r\n               sum(stock_prod_qty_1d_stb) as stock_prod_qty_1d_stb,\r\n               sum(sale_qty) as sale_qty\r\n        from tmp0\r\n        group by ds,sku_code,sap_store_code\r\n    )a\r\n    group by a.sku_code,a.sap_store_code\r\n)\r\n,store_area as (\r\nselect\r\n       a.sap_store_code,\r\ncase when a.area_class1_name \u003d \u0027西藏区\u0027 then \u0027西藏区\u0027 else b.area end as area\r\nfrom dim.dim_store_lastest  a\r\nleft join ods.ods_youdata_442_miniso_sccm_sales_area b on a.comm_opt_manager \u003d b.manager\r\nwhere a.area_class1_name in (\u0027西藏区\u0027,\u0027华东经营大区\u0027,\u0027华北经营大区\u0027,\u0027华西经营大区\u0027,\u0027华南经营大区\u0027,\u0027华中经营大区\u0027)\r\n)\r\n\r\ninsert overwrite table ads.ads_ds_miniso_sccm_delivery_goods_store_detail partition(ds)\r\nselect\r\n    a.stat_date                -- \u0027统计日期\u0027\r\n   ,a.wrh_code                 -- \u0027仓库代码\u0027\r\n   ,a.wrh_name                 -- \u0027仓库名称\u0027\r\n   ,\u0027C1\u0027 as cate1_code         --\u0027大类2代码\u0027\r\n   ,t.cate1_name               -- \u0027大类2名称\u0027\r\n   ,t.cate_code                -- \u0027细类代码\u0027\r\n   ,t.cate_name                -- \u0027细类名称\u0027\r\n   ,a.sku_code                 -- \u0027商品代码\u0027\r\n   ,t.sku_name                --\u0027商品名称\u0027\r\n   ,t.pkg_price                -- \u0027组合价\u0027\r\n   ,a.store_code               -- \u0027门店代码\u0027\r\n   ,a.store_name               -- \u0027门店名称\u0027\r\n   ,d.area  --运营区域\r\n\r\n   ,(c.sale_qty_7/c.store_day_7)  as avg_sales_qty_7days      -- \u0027单店日均销量（7天）\u0027\r\n   ,(c.sale_qty_28/c.store_day_28)  as avg_sales_qty_28days     -- \u0027单店日均销量（28天）\u0027\r\n\r\n   ,b.hav_stock_store_qty      -- \u0027当前有库存门店数\u0027\r\n   ,b.hav_sales_rate_7days     -- \u00277天动销率\u0027\r\n   ,b.being_wrh_turnover_days   -- \u0027即将入仓周转\u0027\r\n   ,b.wrh_turnover_days        -- \u0027仓库周转\u0027\r\n   ,a.zh_days                  -- \u0027门店周转\u0027\r\n\r\n   ,c.sale_qty_7 as sales_qty_7days          -- \u0027销售量-7天（总）\u0027\r\n   ,c.sale_qty_28 as sales_qty_28days         -- \u0027销售量-28天（总）\u0027\r\n   ,date_format(current_timestamp(), \u0027yyyy-MM-dd HH:mm:ss\u0027)\r\n   ,a.ds\r\nfrom ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid a\r\nleft join ads.ads_ds_miniso_sccm_goods_wrh_detail_mid b on a.wrh_code \u003d b.wrh_code and a.sku_code \u003d b.sku_code and b.ds \u003d\u00272021-05-08\u0027\r\nleft join tmp c on a.sku_code \u003d c.sku_code and a.store_code \u003d c.sap_store_code\r\nleft join store_area d on a.store_code \u003d d.sap_store_code\r\nleft join ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid t on a.sku_code \u003d t.sku_code and t.ds \u003d\u00272021-05-08\u0027\r\nwhere a.ds \u003d\u00272021-05-08\u0027",
+  "timestamp": 1688964902,
+  "user": "hive/miniso-newpt2@MINISO-BDP-TEST.CN",
+  "userGroupNames": [
+    "hadoop"
+  ],
+  "version": "1.0",
+  "columnLineages": [
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "stat_date"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "wrh_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "wrh_name"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        }
+      ]
+    },
+    {
+      "destDatabase": "ads",
+      "expression": "\u0027C1\u0027",
+      "edgeType": "PROJECTION",
+      "sources": [],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "cate1_name"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "cate_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "cate_name"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "sku_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "sku_name"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "pkg_price"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "store_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "store_name"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ods",
+      "destDatabase": "ads",
+      "expression": "CASE WHEN ((a.area_class1_name \u003d \u0027西藏区\u0027)) THEN (\u0027西藏区\u0027) ELSE (b.area) END",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "dim_store_lastest",
+          "column": "area_class1_name"
+        },
+        {
+          "table": "ods_youdata_442_miniso_sccm_sales_area",
+          "column": "area"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "destDatabase": "ads",
+      "expression": "(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-05-01\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-05-01\u0027))) THEN (sap_store_code) ELSE (null) END)))",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "destDatabase": "ads",
+      "expression": "(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-04-10\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-04-10\u0027))) THEN (sap_store_code) ELSE (null) END)))",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "expression": "UDFToLong(b.hav_stock_store_qty)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "hav_stock_store_qty"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "hav_sales_rate_7days"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "being_wrh_turnover_days"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "wrh_turnover_days"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "zh_days"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "destDatabase": "ads",
+      "expression": "sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-05-01\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "destDatabase": "ads",
+      "expression": "sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-04-10\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        }
+      ]
+    },
+    {
+      "destDatabase": "ads",
+      "expression": "\u00272023-07-10 12:55:03\u0027",
+      "edgeType": "PROJECTION",
+      "sources": [],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        }
+      ]
+    },
+    {
+      "expression": "\u00272021-05-08\u0027",
+      "edgeType": "PROJECTION",
+      "sources": [],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "(a.ds \u003d \u00272021-05-08\u0027)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "ds"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "(a.sku_code \u003d b.sku_code)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "sku_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "(b.ds \u003d \u00272021-05-08\u0027)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "ds"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "expression": "(a.store_code \u003d sap_store_code)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "expression": "((CAST( a.ds AS DATE) \u003e DATE\u00272021-04-10\u0027) and (a.ds \u003c\u003d \u00272021-05-08\u0027) and a.sap_store_code is not null)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dim",
+      "expression": "(a.sap_store_code \u003d t1.sap_store_code)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        },
+        {
+          "table": "dim_store_info_lastest",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dim",
+      "expression": "((t1.sts_state \u003d \u00273A\u0027) and t1.sap_store_code is not null)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "dim_store_info_lastest",
+          "column": "sts_state"
+        },
+        {
+          "table": "dim_store_info_lastest",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "(a.store_code \u003d a.sap_store_code)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "(a.area_class1_name) IN (\u0027西藏区\u0027, \u0027华东经营大区\u0027, \u0027华北经营大区\u0027, \u0027华西经营大区\u0027, \u0027华南经营大区\u0027, \u0027华中经营大区\u0027)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "area_class1_name"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ods",
+      "expression": "(a.comm_opt_manager \u003d b.manager)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "dim_store_lastest",
+          "column": "comm_opt_manager"
+        },
+        {
+          "table": "ods_youdata_442_miniso_sccm_sales_area",
+          "column": "manager"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "(a.sku_code \u003d t.sku_code)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "sku_code"
+        },
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "sku_code"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "(t.ds \u003d \u00272021-05-08\u0027)",
+      "edgeType": "PREDICATE",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "ds"
+        }
+      ],
+      "targets": [
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "stat_date"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate1_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "cate_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sku_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "pkg_price"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_code"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "area_name"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "avg_sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_stock_store_qty"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "hav_sales_rate_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "being_wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "wrh_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "store_turnover_days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_7days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "sales_qty_28days"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "data_load_time"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_delivery_goods_store_detail",
+          "column": "ds"
+        },
+        {
+          "column": "_col0"
+        },
+        {
+          "column": "_col1"
+        },
+        {
+          "column": "_col2"
+        },
+        {
+          "column": "_col3"
+        },
+        {
+          "column": "_col4"
+        },
+        {
+          "column": "_col5"
+        },
+        {
+          "column": "_col6"
+        },
+        {
+          "column": "_col7"
+        },
+        {
+          "column": "_col8"
+        },
+        {
+          "column": "_col9"
+        },
+        {
+          "column": "_col10"
+        },
+        {
+          "column": "_col11"
+        },
+        {
+          "column": "_col12"
+        },
+        {
+          "column": "_col13"
+        },
+        {
+          "column": "_col14"
+        },
+        {
+          "column": "_col15"
+        },
+        {
+          "column": "_col16"
+        },
+        {
+          "column": "_col17"
+        },
+        {
+          "column": "_col18"
+        },
+        {
+          "column": "_col19"
+        },
+        {
+          "column": "_col20"
+        },
+        {
+          "column": "_col21"
+        },
+        {
+          "column": "_col22"
+        },
+        {
+          "column": "_col23"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.stat_date, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "stat_date"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col0"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_code, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "wrh_code"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col1"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_name, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "wrh_name"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col2"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(\u0027C1\u0027, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid"
+        },
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid"
+        },
+        {
+          "table": "dim_store_lastest"
+        },
+        {
+          "table": "ods_youdata_442_miniso_sccm_sales_area"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col3"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate1_name, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "cate1_name"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col4"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate_code, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "cate_code"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col5"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate_name, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "cate_name"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col6"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.sku_code, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "sku_code"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col7"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.sku_name, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "sku_name"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col8"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.pkg_price, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+          "column": "pkg_price"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col9"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.store_code, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "store_code"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col10"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.store_name, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "store_name"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col11"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ods",
+      "expression": "compute_stats(CASE WHEN ((a.area_class1_name \u003d \u0027西藏区\u0027)) THEN (\u0027西藏区\u0027) ELSE (b.area) END, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "dim_store_lastest",
+          "column": "area_class1_name"
+        },
+        {
+          "table": "ods_youdata_442_miniso_sccm_sales_area",
+          "column": "area"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col12"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "expression": "compute_stats((sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-05-01\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-05-01\u0027))) THEN (sap_store_code) ELSE (null) END))), \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col13"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "expression": "compute_stats((sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-04-10\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-04-10\u0027))) THEN (sap_store_code) ELSE (null) END))), \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "sap_store_code"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sap_store_code"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col14"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(UDFToLong(b.hav_stock_store_qty), \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "hav_stock_store_qty"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col15"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.hav_sales_rate_7days, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "hav_sales_rate_7days"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col16"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.being_wrh_turnover_days, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "being_wrh_turnover_days"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col17"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_turnover_days, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "wrh_turnover_days"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col18"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.zh_days, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+          "column": "zh_days"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col19"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "expression": "compute_stats(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-05-01\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END), \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col20"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "dwd",
+      "expression": "compute_stats(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) \u003e 0.0D) and (sum(stock_prod_qty_1d_stb) \u003e 0.0D) and (CAST( ds AS DATE) \u003e DATE\u00272021-04-10\u0027))) THEN (sum(sale_qty)) ELSE (0.0D) END), \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_ste"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "stock_prod_qty_1d_stb"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "ds"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df",
+          "column": "sale_qty"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col21"
+        }
+      ]
+    },
+    {
+      "srcDatabase": "ads",
+      "expression": "compute_stats(\u00272023-07-10 12:55:03\u0027, \u0027hll\u0027)",
+      "edgeType": "PROJECTION",
+      "sources": [
+        {
+          "table": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid"
+        },
+        {
+          "table": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid"
+        },
+        {
+          "table": "dim_store_lastest"
+        },
+        {
+          "table": "ods_youdata_442_miniso_sccm_sales_area"
+        },
+        {
+          "table": "ads_scm_store_jxcrpt_1d"
+        },
+        {
+          "table": "dws_rpt_store_goods_sale_query_df"
+        },
+        {
+          "table": "ads_ds_miniso_sccm_goods_wrh_detail_mid"
+        }
+      ],
+      "targets": [
+        {
+          "column": "_col22"
+        }
+      ]
+    }
+  ],
+  "tableLineages": [
+    {
+      "srcDatabase": "ads",
+      "srcTable": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid"
+    },
+    {
+      "srcDatabase": "dim",
+      "destDatabase": "ads",
+      "srcTable": "dim_store_lastest",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "srcTable": "ads_scm_store_jxcrpt_1d",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "dim",
+      "destDatabase": "ads",
+      "srcTable": "dim_store_info_lastest",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "dim",
+      "srcTable": "dim_store_info_lastest"
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "srcTable": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "ads",
+      "srcTable": "ads_scm_store_jxcrpt_1d"
+    },
+    {
+      "srcDatabase": "ods",
+      "destDatabase": "ads",
+      "srcTable": "ods_youdata_442_miniso_sccm_sales_area",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "ods",
+      "srcTable": "ods_youdata_442_miniso_sccm_sales_area"
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "srcTable": "tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "ads",
+      "srcTable": "ads_ds_miniso_sccm_goods_wrh_detail_mid"
+    },
+    {
+      "srcDatabase": "ads",
+      "srcTable": "tmp_01_ads_ds_miniso_sccm_goods_detail_mid"
+    },
+    {
+      "srcDatabase": "ads",
+      "destDatabase": "ads",
+      "srcTable": "ads_ds_miniso_sccm_goods_wrh_detail_mid",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "dim",
+      "srcTable": "dim_store_lastest"
+    },
+    {
+      "srcDatabase": "dwd",
+      "destDatabase": "ads",
+      "srcTable": "dws_rpt_store_goods_sale_query_df",
+      "destTable": "ads_ds_miniso_sccm_delivery_goods_store_detail"
+    },
+    {
+      "srcDatabase": "dwd",
+      "srcTable": "dws_rpt_store_goods_sale_query_df"
+    }
+  ]
+}
