@@ -95,7 +95,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
 //        LOG.info("plan.getRootTasks().get(0).getClass() :" + plan.getRootTasks().get(0).getClass());
 //        LOG.info(("========================================")); //hue
 //        LOG.info("hookContext.getUserName():" + hookContext.getUserName());
-//        LOG.info(("========================================")); //ive/miniso-newpt2@MINISO-BDP-TEST.CN
+//        LOG.info(("========================================")); //hive/miniso-newpt2@MINISO-BDP-TEST.CN
 //        LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
 //        LOG.info(("========================================"));
 
