@@ -80,7 +80,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
     }
 
     @Override
-    public void run(final HookContext hookContext) throws IOException, LoginException {
+    public void run(final HookContext hookContext){
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
@@ -103,6 +103,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
         final LineageCtx.Index index = hookContext.getIndex();
         final SessionState ss = SessionState.get();
+        //if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain() && !hookContext.getUserName().equals("hue")) {
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
                 //执行用户

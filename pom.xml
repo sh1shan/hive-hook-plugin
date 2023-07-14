@@ -59,6 +59,12 @@
                 <artifactId>datahub-client</artifactId>
                 <version>0.10.4-3</version>
             </dependency>
+
+            <dependency>
+                <groupId>io.acryl</groupId>
+                <artifactId>datahub-spark-lineage</artifactId>
+                <version>0.10.5-1</version>
+            </dependency>
     </dependencies>
 
     <repositories>
