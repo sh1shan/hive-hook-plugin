@@ -1,0 +1,119 @@
+{
+  "queryId": "hive_20230701122928_dc448f6b-2798-4a90-b1e7-25947c5dd823",
+  "queryType": null,
+  "queryAttributes": {
+    "queryString": ""
+  },
+  "queryCounters": "null",
+  "stageGraph": {
+    "nodeType": "STAGE",
+    "roots": "null",
+    "adjacencyList": [
+      {
+        "node": "Stage-1",
+        "children": [
+          "Stage-2"
+        ],
+        "adjacencyType": "CONJUNCTIVE"
+      },
+      {
+        "node": "Stage-2",
+        "children": [
+          "Stage-0"
+        ],
+        "adjacencyType": "CONJUNCTIVE"
+      },
+      {
+        "node": "Stage-0",
+        "children": [
+          "Stage-3"
+        ],
+        "adjacencyType": "CONJUNCTIVE"
+      }
+    ]
+  },
+  "stageList": [
+    {
+      "stageId": "Stage-1",
+      "stageType": "MAPRED",
+      "stageAttributes": "null",
+      "stageCounters": "}",
+      "taskList": [
+        {
+          "taskId": "Stage-1_OTHER",
+          "taskType": "OTHER",
+          "taskAttributes": "null",
+          "taskCounters": "null",
+          "operatorGraph": "null",
+          "operatorList": "]",
+          "done": "false",
+          "started": "false"
+        }
+      ],
+      "done": "false",
+      "started": "false"
+    },
+    {
+      "stageId": "Stage-2",
+      "stageType": "DEPENDENCY_COLLECTION",
+      "stageAttributes": "null",
+      "stageCounters": "}",
+      "taskList": [
+        {
+          "taskId": "Stage-2_OTHER",
+          "taskType": "OTHER",
+          "taskAttributes": "null",
+          "taskCounters": "null",
+          "operatorGraph": "null",
+          "operatorList": "]",
+          "done": "false",
+          "started": "false"
+        }
+      ],
+      "done": "false",
+      "started": "false"
+    },
+    {
+      "stageId": "Stage-0",
+      "stageType": "MOVE",
+      "stageAttributes": "null",
+      "stageCounters": "}",
+      "taskList": [
+        {
+          "taskId": "Stage-0_OTHER",
+          "taskType": "OTHER",
+          "taskAttributes": "null",
+          "taskCounters": "null",
+          "operatorGraph": "null",
+          "operatorList": "]",
+          "done": "false",
+          "started": "false"
+        }
+      ],
+      "done": "false",
+      "started": "false"
+    },
+    {
+      "stageId": "Stage-3",
+      "stageType": "STATS",
+      "stageAttributes": "null",
+      "stageCounters": "}",
+      "taskList": [
+        {
+          "taskId": "Stage-3_OTHER",
+          "taskType": "OTHER",
+          "taskAttributes": "null",
+          "taskCounters": "null",
+          "operatorGraph": "null",
+          "operatorList": "]",
+          "done": "false",
+          "started": "false"
+        }
+      ],
+      "done": "false",
+      "started": "false"
+    }
+  ],
+  "done": "false",
+  "started": "true"
+}

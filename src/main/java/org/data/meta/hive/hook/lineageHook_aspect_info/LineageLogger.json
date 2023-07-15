@@ -1,0 +1,1663 @@
+{
+  "version": "1.0",
+  "user": "hive/miniso-newpt2@MINISO-BDP-TEST.CN",
+  "timestamp": 1688185768,
+  "duration": 16180,
+  "jobIds": [],
+  "engine": "tez",
+  "database": "dwd",
+  "hash": "6df5b6f46a89017b68277e523f3cf776",
+  "queryText": "with tmp0 as (\nselect\n    a.ds,\n    a.prod_id as sku_code,\n    a.sap_store_code,\n    a.stock_prod_qty_1d_ste,\n    a.stock_prod_qty_1d_stb,\n    0 as sale_qty\nfrom ads.ads_scm_store_jxcrpt_1d a\nleft join dim.dim_store_info_lastest t1 on a.sap_store_code=t1.sap_store_code\nwhere a.ds > date_sub('2021-05-08',28) and  a.ds <= '2021-05-08' and t1.sts_state = '3A'\nunion all\nselect\n        a.ds,\n        a.sku_code,\n        a.sap_store_code ,\n        0 as stock_prod_qty_1d_ste ,\n        0 as stock_prod_qty_1d_stb ,\n        a.sale_qty\n    from dwd.dws_rpt_store_goods_sale_query_df a\n    left join dim.dim_store_info_lastest t1 on a.sap_store_code=t1.sap_store_code\n    where a.ds > date_sub('2021-05-08',28) and  a.ds <= '2021-05-08' and t1.sts_state = '3A'\n)\n,\ntmp as(\n    select\n           a.sku_code,\n           a.sap_store_code,\n           count(case when stock_prod_qty_1d_ste > 0 and stock_prod_qty_1d_stb > 0 and ds > date_sub('2021-05-08',7) then a.sap_store_code end ) as store_day_7,     --近7天符合条件门店数 --日均销门店数\n           count(case when stock_prod_qty_1d_ste > 0 and stock_prod_qty_1d_stb > 0 and ds > date_sub('2021-05-08',28) then a.sap_store_code end) as store_day_28,    --近28天符合条件门店数 --日均销门店数\n           sum(case when stock_prod_qty_1d_ste > 0 and stock_prod_qty_1d_stb > 0 and ds > date_sub('2021-05-08',7) then a.sale_qty else 0 end) as sale_qty_7,  --近七天符合条件销售数量  --日均销销量\n           sum(case when stock_prod_qty_1d_ste > 0 and stock_prod_qty_1d_stb > 0 and ds > date_sub('2021-05-08',28) then a.sale_qty else 0 end) as sale_qty_28  --近28天符合条件销售数量  --日均销销量\n    from (\n        select\n               ds,\n               sku_code,\n               sap_store_code,\n               sum(stock_prod_qty_1d_ste) as stock_prod_qty_1d_ste,\n               sum(stock_prod_qty_1d_stb) as stock_prod_qty_1d_stb,\n               sum(sale_qty) as sale_qty\n        from tmp0\n        group by ds,sku_code,sap_store_code\n    )a\n    group by a.sku_code,a.sap_store_code\n)\n,store_area as (\nselect\n       a.sap_store_code,\ncase when a.area_class1_name = '西藏区' then '西藏区' else b.area end as area\nfrom dim.dim_store_lastest  a\nleft join ods.ods_youdata_442_miniso_sccm_sales_area b on a.comm_opt_manager = b.manager\nwhere a.area_class1_name in ('西藏区','华东经营大区','华北经营大区','华西经营大区','华南经营大区','华中经营大区')\n)\n\ninsert overwrite table ads.ads_ds_miniso_sccm_delivery_goods_store_detail partition(ds)\nselect\n    a.stat_date                -- '统计日期'\n   ,a.wrh_code                 -- '仓库代码'\n   ,a.wrh_name                 -- '仓库名称'\n   ,'C1' as cate1_code         --'大类2代码'\n   ,t.cate1_name               -- '大类2名称'\n   ,t.cate_code                -- '细类代码'\n   ,t.cate_name                -- '细类名称'\n   ,a.sku_code                 -- '商品代码'\n   ,t.sku_name                --'商品名称'\n   ,t.pkg_price                -- '组合价'\n   ,a.store_code               -- '门店代码'\n   ,a.store_name               -- '门店名称'\n   ,d.area  --运营区域\n\n   ,(c.sale_qty_7/c.store_day_7)  as avg_sales_qty_7days      -- '单店日均销量（7天）'\n   ,(c.sale_qty_28/c.store_day_28)  as avg_sales_qty_28days     -- '单店日均销量（28天）'\n\n   ,b.hav_stock_store_qty      -- '当前有库存门店数'\n   ,b.hav_sales_rate_7days     -- '7天动销率'\n   ,b.being_wrh_turnover_days   -- '即将入仓周转'\n   ,b.wrh_turnover_days        -- '仓库周转'\n   ,a.zh_days                  -- '门店周转'\n\n   ,c.sale_qty_7 as sales_qty_7days          -- '销售量-7天（总）'\n   ,c.sale_qty_28 as sales_qty_28days         -- '销售量-28天（总）'\n   ,date_format(current_timestamp(), 'yyyy-MM-dd HH:mm:ss')\n   ,a.ds\nfrom ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid a\nleft join ads.ads_ds_miniso_sccm_goods_wrh_detail_mid b on a.wrh_code = b.wrh_code and a.sku_code = b.sku_code and b.ds ='2021-05-08'\nleft join tmp c on a.sku_code = c.sku_code and a.store_code = c.sap_store_code\nleft join store_area d on a.store_code = d.sap_store_code\nleft join ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid t on a.sku_code = t.sku_code and t.ds ='2021-05-08'\nwhere a.ds ='2021-05-08'",
+  "edges": [
+    {
+      "sources": [
+        48
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        49
+      ],
+      "targets": [
+        1
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        50
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        3
+      ],
+      "expression": "'C1'",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        51
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        52
+      ],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        53
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        54
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        55
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        56
+      ],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        57
+      ],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        58
+      ],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        59,
+        60
+      ],
+      "targets": [
+        12
+      ],
+      "expression": "CASE WHEN ((a.area_class1_name = '西藏区')) THEN ('西藏区') ELSE (b.area) END",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ],
+      "targets": [
+        13
+      ],
+      "expression": "(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-05-01'))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-05-01'))) THEN (sap_store_code) ELSE (null) END)))",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ],
+      "targets": [
+        14
+      ],
+      "expression": "(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-04-10'))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-04-10'))) THEN (sap_store_code) ELSE (null) END)))",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        68
+      ],
+      "targets": [
+        15
+      ],
+      "expression": "UDFToLong(b.hav_stock_store_qty)",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        69
+      ],
+      "targets": [
+        16
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        70
+      ],
+      "targets": [
+        17
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        71
+      ],
+      "targets": [
+        18
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        72
+      ],
+      "targets": [
+        19
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65
+      ],
+      "targets": [
+        20
+      ],
+      "expression": "sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-05-01'))) THEN (sum(sale_qty)) ELSE (0.0D) END)",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65
+      ],
+      "targets": [
+        21
+      ],
+      "expression": "sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-04-10'))) THEN (sum(sale_qty)) ELSE (0.0D) END)",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        22
+      ],
+      "expression": "'2023-07-01 12:29:28'",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        23,
+        24
+      ],
+      "expression": "'2021-05-08'",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        73
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.ds = '2021-05-08')",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        54,
+        74
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.sku_code = b.sku_code)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        75
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(b.ds = '2021-05-08')",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        57,
+        66,
+        67
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.store_code = sap_store_code)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        63,
+        66,
+        64
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "((CAST( a.ds AS DATE) > DATE'2021-04-10') and (a.ds <= '2021-05-08') and a.sap_store_code is not null)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        66,
+        76
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.sap_store_code = t1.sap_store_code)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        77,
+        76
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "((t1.sts_state = '3A') and t1.sap_store_code is not null)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        57,
+        66
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.store_code = a.sap_store_code)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        78
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.area_class1_name) IN ('西藏区', '华东经营大区', '华北经营大区', '华西经营大区', '华南经营大区', '华中经营大区')",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        79,
+        80
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.comm_opt_manager = b.manager)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        54,
+        81
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(a.sku_code = t.sku_code)",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        82
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        24
+      ],
+      "expression": "(t.ds = '2021-05-08')",
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        48
+      ],
+      "targets": [
+        25
+      ],
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.stat_date, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        49
+      ],
+      "targets": [
+        26
+      ],
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_code, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        50
+      ],
+      "targets": [
+        27
+      ],
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_name, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89
+      ],
+      "targets": [
+        28
+      ],
+      "expression": "compute_stats('C1', 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        51
+      ],
+      "targets": [
+        29
+      ],
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate1_name, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        52
+      ],
+      "targets": [
+        30
+      ],
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate_code, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        53
+      ],
+      "targets": [
+        31
+      ],
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate_name, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        54
+      ],
+      "targets": [
+        32
+      ],
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.sku_code, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        55
+      ],
+      "targets": [
+        33
+      ],
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.sku_name, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        56
+      ],
+      "targets": [
+        34
+      ],
+      "expression": "compute_stats(ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.pkg_price, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        57
+      ],
+      "targets": [
+        35
+      ],
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.store_code, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        58
+      ],
+      "targets": [
+        36
+      ],
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.store_name, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        59,
+        60
+      ],
+      "targets": [
+        37
+      ],
+      "expression": "compute_stats(CASE WHEN ((a.area_class1_name = '西藏区')) THEN ('西藏区') ELSE (b.area) END, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ],
+      "targets": [
+        38
+      ],
+      "expression": "compute_stats((sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-05-01'))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-05-01'))) THEN (sap_store_code) ELSE (null) END))), 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ],
+      "targets": [
+        39
+      ],
+      "expression": "compute_stats((sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-04-10'))) THEN (sum(sale_qty)) ELSE (0.0D) END) / UDFToDouble(count(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-04-10'))) THEN (sap_store_code) ELSE (null) END))), 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        68
+      ],
+      "targets": [
+        40
+      ],
+      "expression": "compute_stats(UDFToLong(b.hav_stock_store_qty), 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        69
+      ],
+      "targets": [
+        41
+      ],
+      "expression": "compute_stats(ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.hav_sales_rate_7days, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        70
+      ],
+      "targets": [
+        42
+      ],
+      "expression": "compute_stats(ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.being_wrh_turnover_days, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        71
+      ],
+      "targets": [
+        43
+      ],
+      "expression": "compute_stats(ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_turnover_days, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        72
+      ],
+      "targets": [
+        44
+      ],
+      "expression": "compute_stats(ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.zh_days, 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65
+      ],
+      "targets": [
+        45
+      ],
+      "expression": "compute_stats(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-05-01'))) THEN (sum(sale_qty)) ELSE (0.0D) END), 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        61,
+        62,
+        63,
+        64,
+        65
+      ],
+      "targets": [
+        46
+      ],
+      "expression": "compute_stats(sum(CASE WHEN (((sum(stock_prod_qty_1d_ste) > 0.0D) and (sum(stock_prod_qty_1d_stb) > 0.0D) and (CAST( ds AS DATE) > DATE'2021-04-10'))) THEN (sum(sale_qty)) ELSE (0.0D) END), 'hll')",
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89
+      ],
+      "targets": [
+        47
+      ],
+      "expression": "compute_stats('2023-07-01 12:29:28', 'hll')",
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "vertices": [
+    {
+      "id": 0,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.stat_date"
+    },
+    {
+      "id": 1,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.wrh_code"
+    },
+    {
+      "id": 2,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.wrh_name"
+    },
+    {
+      "id": 3,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.cate1_code"
+    },
+    {
+      "id": 4,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.cate1_name"
+    },
+    {
+      "id": 5,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.cate_code"
+    },
+    {
+      "id": 6,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.cate_name"
+    },
+    {
+      "id": 7,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.sku_code"
+    },
+    {
+      "id": 8,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.sku_name"
+    },
+    {
+      "id": 9,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.pkg_price"
+    },
+    {
+      "id": 10,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.store_code"
+    },
+    {
+      "id": 11,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.store_name"
+    },
+    {
+      "id": 12,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.area_name"
+    },
+    {
+      "id": 13,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.avg_sales_qty_7days"
+    },
+    {
+      "id": 14,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.avg_sales_qty_28days"
+    },
+    {
+      "id": 15,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.hav_stock_store_qty"
+    },
+    {
+      "id": 16,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.hav_sales_rate_7days"
+    },
+    {
+      "id": 17,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.being_wrh_turnover_days"
+    },
+    {
+      "id": 18,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.wrh_turnover_days"
+    },
+    {
+      "id": 19,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.store_turnover_days"
+    },
+    {
+      "id": 20,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.sales_qty_7days"
+    },
+    {
+      "id": 21,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.sales_qty_28days"
+    },
+    {
+      "id": 22,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.data_load_time"
+    },
+    {
+      "id": 23,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_delivery_goods_store_detail.ds"
+    },
+    {
+      "id": 24,
+      "vertexType": "COLUMN",
+      "vertexId": "_col23"
+    },
+    {
+      "id": 25,
+      "vertexType": "COLUMN",
+      "vertexId": "_col0"
+    },
+    {
+      "id": 26,
+      "vertexType": "COLUMN",
+      "vertexId": "_col1"
+    },
+    {
+      "id": 27,
+      "vertexType": "COLUMN",
+      "vertexId": "_col2"
+    },
+    {
+      "id": 28,
+      "vertexType": "COLUMN",
+      "vertexId": "_col3"
+    },
+    {
+      "id": 29,
+      "vertexType": "COLUMN",
+      "vertexId": "_col4"
+    },
+    {
+      "id": 30,
+      "vertexType": "COLUMN",
+      "vertexId": "_col5"
+    },
+    {
+      "id": 31,
+      "vertexType": "COLUMN",
+      "vertexId": "_col6"
+    },
+    {
+      "id": 32,
+      "vertexType": "COLUMN",
+      "vertexId": "_col7"
+    },
+    {
+      "id": 33,
+      "vertexType": "COLUMN",
+      "vertexId": "_col8"
+    },
+    {
+      "id": 34,
+      "vertexType": "COLUMN",
+      "vertexId": "_col9"
+    },
+    {
+      "id": 35,
+      "vertexType": "COLUMN",
+      "vertexId": "_col10"
+    },
+    {
+      "id": 36,
+      "vertexType": "COLUMN",
+      "vertexId": "_col11"
+    },
+    {
+      "id": 37,
+      "vertexType": "COLUMN",
+      "vertexId": "_col12"
+    },
+    {
+      "id": 38,
+      "vertexType": "COLUMN",
+      "vertexId": "_col13"
+    },
+    {
+      "id": 39,
+      "vertexType": "COLUMN",
+      "vertexId": "_col14"
+    },
+    {
+      "id": 40,
+      "vertexType": "COLUMN",
+      "vertexId": "_col15"
+    },
+    {
+      "id": 41,
+      "vertexType": "COLUMN",
+      "vertexId": "_col16"
+    },
+    {
+      "id": 42,
+      "vertexType": "COLUMN",
+      "vertexId": "_col17"
+    },
+    {
+      "id": 43,
+      "vertexType": "COLUMN",
+      "vertexId": "_col18"
+    },
+    {
+      "id": 44,
+      "vertexType": "COLUMN",
+      "vertexId": "_col19"
+    },
+    {
+      "id": 45,
+      "vertexType": "COLUMN",
+      "vertexId": "_col20"
+    },
+    {
+      "id": 46,
+      "vertexType": "COLUMN",
+      "vertexId": "_col21"
+    },
+    {
+      "id": 47,
+      "vertexType": "COLUMN",
+      "vertexId": "_col22"
+    },
+    {
+      "id": 48,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.stat_date"
+    },
+    {
+      "id": 49,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_code"
+    },
+    {
+      "id": 50,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_name"
+    },
+    {
+      "id": 51,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate1_name"
+    },
+    {
+      "id": 52,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate_code"
+    },
+    {
+      "id": 53,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.cate_name"
+    },
+    {
+      "id": 54,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.sku_code"
+    },
+    {
+      "id": 55,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.sku_name"
+    },
+    {
+      "id": 56,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.pkg_price"
+    },
+    {
+      "id": 57,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.store_code"
+    },
+    {
+      "id": 58,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.store_name"
+    },
+    {
+      "id": 59,
+      "vertexType": "COLUMN",
+      "vertexId": "dim.dim_store_lastest.area_class1_name"
+    },
+    {
+      "id": 60,
+      "vertexType": "COLUMN",
+      "vertexId": "ods.ods_youdata_442_miniso_sccm_sales_area.area"
+    },
+    {
+      "id": 61,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_scm_store_jxcrpt_1d.stock_prod_qty_1d_ste"
+    },
+    {
+      "id": 62,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_scm_store_jxcrpt_1d.stock_prod_qty_1d_stb"
+    },
+    {
+      "id": 63,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_scm_store_jxcrpt_1d.ds"
+    },
+    {
+      "id": 64,
+      "vertexType": "COLUMN",
+      "vertexId": "dwd.dws_rpt_store_goods_sale_query_df.ds"
+    },
+    {
+      "id": 65,
+      "vertexType": "COLUMN",
+      "vertexId": "dwd.dws_rpt_store_goods_sale_query_df.sale_qty"
+    },
+    {
+      "id": 66,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_scm_store_jxcrpt_1d.sap_store_code"
+    },
+    {
+      "id": 67,
+      "vertexType": "COLUMN",
+      "vertexId": "dwd.dws_rpt_store_goods_sale_query_df.sap_store_code"
+    },
+    {
+      "id": 68,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.hav_stock_store_qty"
+    },
+    {
+      "id": 69,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.hav_sales_rate_7days"
+    },
+    {
+      "id": 70,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.being_wrh_turnover_days"
+    },
+    {
+      "id": 71,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.wrh_turnover_days"
+    },
+    {
+      "id": 72,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.zh_days"
+    },
+    {
+      "id": 73,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.ds"
+    },
+    {
+      "id": 74,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.sku_code"
+    },
+    {
+      "id": 75,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.ads_ds_miniso_sccm_goods_wrh_detail_mid.ds"
+    },
+    {
+      "id": 76,
+      "vertexType": "COLUMN",
+      "vertexId": "dim.dim_store_info_lastest.sap_store_code"
+    },
+    {
+      "id": 77,
+      "vertexType": "COLUMN",
+      "vertexId": "dim.dim_store_info_lastest.sts_state"
+    },
+    {
+      "id": 78,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid.area_class1_name"
+    },
+    {
+      "id": 79,
+      "vertexType": "COLUMN",
+      "vertexId": "dim.dim_store_lastest.comm_opt_manager"
+    },
+    {
+      "id": 80,
+      "vertexType": "COLUMN",
+      "vertexId": "ods.ods_youdata_442_miniso_sccm_sales_area.manager"
+    },
+    {
+      "id": 81,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.sku_code"
+    },
+    {
+      "id": 82,
+      "vertexType": "COLUMN",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid.ds"
+    },
+    {
+      "id": 83,
+      "vertexType": "TABLE",
+      "vertexId": "ads.tmp_05_ads_ds_miniso_sccm_goods_wrh_detail_mid"
+    },
+    {
+      "id": 84,
+      "vertexType": "TABLE",
+      "vertexId": "ads.tmp_01_ads_ds_miniso_sccm_goods_detail_mid"
+    },
+    {
+      "id": 85,
+      "vertexType": "TABLE",
+      "vertexId": "dim.dim_store_lastest"
+    },
+    {
+      "id": 86,
+      "vertexType": "TABLE",
+      "vertexId": "ods.ods_youdata_442_miniso_sccm_sales_area"
+    },
+    {
+      "id": 87,
+      "vertexType": "TABLE",
+      "vertexId": "ads.ads_scm_store_jxcrpt_1d"
+    },
+    {
+      "id": 88,
+      "vertexType": "TABLE",
+      "vertexId": "dwd.dws_rpt_store_goods_sale_query_df"
+    },
+    {
+      "id": 89,
+      "vertexType": "TABLE",
+      "vertexId": "ads.ads_ds_miniso_sccm_goods_wrh_detail_mid"
+    }
+  ]
+}

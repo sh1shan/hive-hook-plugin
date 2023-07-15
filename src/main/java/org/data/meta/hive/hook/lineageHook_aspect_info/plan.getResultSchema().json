@@ -1,0 +1,240 @@
+{
+  "fieldSchemas": [
+    {
+      "name": "_col0",
+      "type": "string"
+    },
+    {
+      "name": "_col1",
+      "type": "string"
+    },
+    {
+      "name": "_col2",
+      "type": "string"
+    },
+    {
+      "name": "_col3",
+      "type": "int"
+    },
+    {
+      "name": "_col4",
+      "type": "string"
+    },
+    {
+      "name": "_col5",
+      "type": "string"
+    },
+    {
+      "name": "_col6",
+      "type": "decimal(24,2)"
+    },
+    {
+      "name": "_col7",
+      "type": "string"
+    },
+    {
+      "name": "_col8",
+      "type": "decimal(24,2)"
+    },
+    {
+      "name": "_col9",
+      "type": "int"
+    },
+    {
+      "name": "_col10",
+      "type": "string"
+    },
+    {
+      "name": "_col11",
+      "type": "date"
+    },
+    {
+      "name": "_col12",
+      "type": "decimal(24,2)"
+    },
+    {
+      "name": "_col13",
+      "type": "date"
+    },
+    {
+      "name": "_col14",
+      "type": "string"
+    },
+    {
+      "name": "_col15",
+      "type": "string"
+    },
+    {
+      "name": "_col16",
+      "type": "string"
+    },
+    {
+      "name": "_col17",
+      "type": "string"
+    },
+    {
+      "name": "_col18",
+      "type": "string"
+    },
+    {
+      "name": "_col19",
+      "type": "string"
+    },
+    {
+      "name": "_col20",
+      "type": "bigint"
+    },
+    {
+      "name": "_col21",
+      "type": "string"
+    },
+    {
+      "name": "_col22",
+      "type": "string"
+    },
+    {
+      "name": "_col23",
+      "type": "string"
+    },
+    {
+      "name": "_col24",
+      "type": "string"
+    },
+    {
+      "name": "_col25",
+      "type": "string"
+    },
+    {
+      "name": "_col26",
+      "type": "string"
+    },
+    {
+      "name": "_col27",
+      "type": "string"
+    },
+    {
+      "name": "_col28",
+      "type": "string"
+    },
+    {
+      "name": "_col29",
+      "type": "string"
+    },
+    {
+      "name": "_col30",
+      "type": "string"
+    },
+    {
+      "name": "_col31",
+      "type": "string"
+    },
+    {
+      "name": "_col32",
+      "type": "string"
+    },
+    {
+      "name": "_col33",
+      "type": "string"
+    },
+    {
+      "name": "_col34",
+      "type": "string"
+    },
+    {
+      "name": "_col35",
+      "type": "string"
+    },
+    {
+      "name": "_col36",
+      "type": "string"
+    },
+    {
+      "name": "_col37",
+      "type": "string"
+    },
+    {
+      "name": "_col38",
+      "type": "string"
+    },
+    {
+      "name": "_col39",
+      "type": "string"
+    },
+    {
+      "name": "_col40",
+      "type": "string"
+    },
+    {
+      "name": "_col41",
+      "type": "string"
+    },
+    {
+      "name": "_col42",
+      "type": "string"
+    },
+    {
+      "name": "_col43",
+      "type": "string"
+    },
+    {
+      "name": "_col44",
+      "type": "string"
+    },
+    {
+      "name": "_col45",
+      "type": "string"
+    },
+    {
+      "name": "_col46",
+      "type": "string"
+    },
+    {
+      "name": "_col47",
+      "type": "string"
+    },
+    {
+      "name": "_col48",
+      "type": "string"
+    },
+    {
+      "name": "_col49",
+      "type": "string"
+    },
+    {
+      "name": "_col50",
+      "type": "string"
+    },
+    {
+      "name": "_col51",
+      "type": "string"
+    },
+    {
+      "name": "_col52",
+      "type": "string"
+    },
+    {
+      "name": "_col53",
+      "type": "string"
+    },
+    {
+      "name": "_col54",
+      "type": "string"
+    },
+    {
+      "name": "_col55",
+      "type": "string"
+    },
+    {
+      "name": "_col56",
+      "type": "string"
+    },
+    {
+      "name": "_col57",
+      "type": "decimal(20,4)"
+    },
+    {
+      "name": "_col58",
+      "type": "string"
+    }
+  ]
+}

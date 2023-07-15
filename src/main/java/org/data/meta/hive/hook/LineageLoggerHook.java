@@ -106,27 +106,20 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         //if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain() && !hookContext.getUserName().equals("hue")) {
         if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain()) {
             try {
-                //执行用户
-                String user = null;
-                String[] userGroupNames = null;
-                Long timestamp = null;
-                long duration = 0L;
                 final List<String> jobIds = new ArrayList<>();
-                String engine = null;
-                String hash = null;
-                String queryText = null;
                 final String queryStr = plan.getQueryStr().trim();
                 final HiveConf conf = ss.getConf();
+                //TODO 这里有个小bug，可能获取不到，或者不准
                 long queryTime = plan.getQueryStartTime();
                 if (queryTime == 0L) {
                     queryTime = System.currentTimeMillis();
                 }
-                duration = System.currentTimeMillis() - queryTime;
-                //TODO UGI自带执行用户信息，执行计划中还有提交用户的信息，可自行判断取哪个用户
+                long duration = System.currentTimeMillis() - queryTime;
+                //TODO UGI自带执行用户，HookContext也有一个userName，可自行判断取哪个用户
                 //RetryingMetaStoreClient proxy=class org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClient ugi=hive/xxxx-newpt2@XXXX-BDP-TEST.CN (auth:KERBEROS) retries=24 delay=5 lifetime=0
-                user = hookContext.getUgi().getUserName();
-                userGroupNames = hookContext.getUgi().getGroupNames();
-                timestamp = queryTime / 1000L;
+                String user = hookContext.getUgi().getUserName();
+                String[] userGroupNames = hookContext.getUgi().getGroupNames();
+                Long timestamp = queryTime / 1000L;
                 //因为该Hook是postHook，执行完才会被调用，HookContext会保存相关任务执行的信息
                 final List<TaskRunner> tasks = hookContext.getCompleteTaskList();
                 if (tasks != null && !tasks.isEmpty()) {
@@ -138,9 +131,8 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                     }
                 }
                 //所以这个配置文件里面就有的，实际可以任务执行中来覆盖这个值
-                engine = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
-                hash = DigestUtils.md5Hex(queryStr);
-                queryText = queryStr;
+                String engine = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
+                String hash = DigestUtils.md5Hex(queryStr);
                 final List<Edge> edges = this.getEdges(plan, index);
                 //根据edge获取表级血缘关系
                 final TableLineage tableLineage = this.buildTableLineages(edges);
@@ -154,7 +146,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 lhInfo.setEngine(engine);
                 lhInfo.setHash(hash);
                 lhInfo.setJobIds(jobIds);
-                lhInfo.setQueryText(queryText);
+                lhInfo.setQueryText(queryStr);
                 lhInfo.setTimestamp(timestamp);
                 lhInfo.setUser(user);
                 lhInfo.setUserGroupNames(userGroupNames);
