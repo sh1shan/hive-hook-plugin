@@ -13,6 +13,7 @@ public class CreateTableAction extends HiveMetaAction {
     private boolean temporary;
     private String tableType;
     private Map<String, String> parameters;
+    //TODO 保留时间
     private int retention;
     private long lastAccessTime;
     private long createTime;

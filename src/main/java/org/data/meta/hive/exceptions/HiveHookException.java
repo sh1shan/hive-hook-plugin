@@ -1,9 +1,6 @@
 package org.data.meta.hive.exceptions;
 
-/**
- * @author chenchaolin
- * @date 2023-07-02
- */
+
 public class HiveHookException extends RuntimeException {
 
     private static final long serialVersionUID = 4209504057102032847L;
