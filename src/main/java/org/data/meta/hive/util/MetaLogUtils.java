@@ -3,6 +3,7 @@ package org.data.meta.hive.util;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -22,6 +23,12 @@ public class MetaLogUtils {
         return FileUtils.makePartName(partitionColumns, partitionValues);
     }
 
+    /**
+     * 其实就是做lowercase的规范化处理
+     *
+     * @param identifier identifier
+     * @return String
+     */
     public static String normalizeIdentifier(String identifier) {
         return StringUtils.isBlank(identifier) ? identifier : HiveStringUtils.normalizeIdentifier(identifier);
     }

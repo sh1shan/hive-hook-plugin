@@ -1,0 +1,315 @@
+{
+  "browsePaths": {
+    "paths": [
+      "/test/hive/cfbtest"
+    ]
+  },
+  "browsePathsV2": {
+    "path": [
+      {
+        "id": "urn:li:container:4a22c8a6dd2026cfc588f6803016965f",
+        "urn": "urn:li:container:4a22c8a6dd2026cfc588f6803016965f"
+      },
+      {
+        "id": "urn:li:container:8ef7722e79fe66169f853816a329a846",
+        "urn": "urn:li:container:8ef7722e79fe66169f853816a329a846"
+      }
+    ]
+  },
+  "container": {
+    "container": "urn:li:container:8ef7722e79fe66169f853816a329a846"
+  },
+  "dataPlatformInstance": {
+    "platform": "urn:li:dataPlatform:hive"
+  },
+  "datasetKey": {
+    "name": "cfbtest.ads_canada_shelf_display",
+    "origin": "TEST",
+    "platform": "urn:li:dataPlatform:hive"
+  },
+  "datasetProperties": {
+    "customProperties": {
+      "Bucket Columns:": "[]",
+      "Compressed:": "No",
+      "CreateTime:": "Wed Jan 19 15:32:30 CST 2022",
+      "Database:": "cfbtest",
+      "InputFormat:": "org.apache.hadoop.mapred.TextInputFormat",
+      "LastAccessTime:": "UNKNOWN",
+      "Location:": "hdfs://miniso-newpt1:8020/warehouse/tablespace/managed/hive/cfbtest.db/ads_canada_shelf_display",
+      "Num Buckets:": "-1",
+      "OutputFormat:": "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+      "Owner:": "spark",
+      "OwnerType:": "USER",
+      "Retention:": "0",
+      "SerDe Library:": "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
+      "Sort Columns:": "[]",
+      "Storage Desc Params: field.delim": "\\u00001",
+      "Storage Desc Params: serialization.format": "\\u00001",
+      "Table Parameters: bucketing_version": "2",
+      "Table Parameters: spark.sql.create.version": "2.3.2.3.1.4.0-315",
+      "Table Parameters: spark.sql.sources.schema.numParts": "1",
+      "Table Parameters: spark.sql.sources.schema.part.0": "{\\\"type\\\":\\\"struct\\\",\\\"fields\\\":[{\\\"name\\\":\\\"store_code\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"store_name\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"ip_code\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"display_code\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"display_name\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"default_type\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"proportion\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"approval_status\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"updated_date\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"file_date\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"shelf_detail_id\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"created_date\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"country_code\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"country_name\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"shelf_code\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"shelf_name\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}},{\\\"name\\\":\\\"cap_time\\\",\\\"type\\\":\\\"string\\\",\\\"nullable\\\":true,\\\"metadata\\\":{}}]}",
+      "Table Parameters: transient_lastDdlTime": "1642577550",
+      "Table Type:": "MANAGED_TABLE"
+    },
+    "name": "ads_canada_shelf_display",
+    "tags": []
+  },
+  "ownership": {
+    "lastModified": {
+      "actor": "urn:li:corpuser:datahub",
+      "time": 1682300227
+    },
+    "owners": [
+      {
+        "owner": "urn:li:corpuser:athos",
+        "type": "DATAOWNER"
+      },
+      {
+        "owner": "urn:li:corpuser:porthos",
+        "type": "DATAOWNER"
+      },
+      {
+        "owner": "urn:li:corpuser:aramis",
+        "type": "DATAOWNER"
+      },
+      {
+        "owner": "urn:li:corpGroup:the_three_musketeers",
+        "type": "DATAOWNER"
+      }
+    ]
+  },
+  "schemaMetadata": {
+    "created": {
+      "actor": "urn:li:corpuser:unknown",
+      "time": 0
+    },
+    "fields": [
+      {
+        "fieldPath": "store_code",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "store_name",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "ip_code",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "display_code",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "display_name",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "default_type",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "proportion",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "approval_status",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "updated_date",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "file_date",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "shelf_detail_id",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "created_date",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "country_code",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "country_name",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "shelf_code",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "shelf_name",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      },
+      {
+        "fieldPath": "cap_time",
+        "isPartOfKey": false,
+        "nativeDataType": "string",
+        "nullable": true,
+        "recursive": false,
+        "type": {
+          "type": {
+            "com.linkedin.schema.StringType": {}
+          }
+        }
+      }
+    ],
+    "hash": "",
+    "lastModified": {
+      "actor": "urn:li:corpuser:unknown",
+      "time": 0
+    },
+    "platform": "urn:li:dataPlatform:hive",
+    "platformSchema": {
+      "com.linkedin.schema.MySqlDDL": {
+        "tableSchema": ""
+      }
+    },
+    "schemaName": "cfbtest.ads_canada_shelf_display",
+    "version": 0
+  },
+  "status": {
+    "removed": false
+  },
+  "subTypes": {
+    "typeNames": [
+      "Table"
+    ]
+  }
+}

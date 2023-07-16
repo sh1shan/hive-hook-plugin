@@ -1,0 +1,236 @@
+{
+  "columns": [
+    {
+      "comment": "一级区域代码",
+      "position": 0,
+      "type": "string",
+      "columnName": "area_1_code"
+    },
+    {
+      "comment": "一级区域名称",
+      "position": 1,
+      "type": "string",
+      "columnName": "area_1_name"
+    },
+    {
+      "comment": "二级区域代码",
+      "position": 2,
+      "type": "string",
+      "columnName": "area_2_code"
+    },
+    {
+      "comment": "二级区域名称",
+      "position": 3,
+      "type": "string",
+      "columnName": "area_2_name"
+    },
+    {
+      "comment": "门店代码",
+      "position": 4,
+      "type": "string",
+      "columnName": "store_code"
+    },
+    {
+      "comment": "门店名称",
+      "position": 5,
+      "type": "string",
+      "columnName": "store_name"
+    },
+    {
+      "comment": "区域经理",
+      "position": 6,
+      "type": "string",
+      "columnName": "qmanager"
+    },
+    {
+      "comment": "省份",
+      "position": 7,
+      "type": "string",
+      "columnName": "province"
+    },
+    {
+      "comment": "城市",
+      "position": 8,
+      "type": "string",
+      "columnName": "city"
+    },
+    {
+      "comment": "城市等级",
+      "position": 9,
+      "type": "string",
+      "columnName": "city_level"
+    },
+    {
+      "comment": "门店状态",
+      "position": 10,
+      "type": "string",
+      "columnName": "store_status"
+    },
+    {
+      "comment": "开业日期",
+      "position": 11,
+      "type": "string",
+      "columnName": "open_date"
+    },
+    {
+      "comment": "应收金额",
+      "position": 12,
+      "type": "decimal(20,2)",
+      "columnName": "std_amount"
+    },
+    {
+      "comment": "实收金额",
+      "position": 13,
+      "type": "decimal(20,2)",
+      "columnName": "real_amount"
+    },
+    {
+      "comment": "销售毛利",
+      "position": 14,
+      "type": "decimal(20,2)",
+      "columnName": "sale_profit"
+    },
+    {
+      "comment": "毛利率",
+      "position": 15,
+      "type": "decimal(20,2)",
+      "columnName": "profit_rate"
+    },
+    {
+      "comment": "团购金额",
+      "position": 16,
+      "type": "decimal(20,2)",
+      "columnName": "group_amt"
+    },
+    {
+      "comment": "销售笔数",
+      "position": 17,
+      "type": "decimal(20,2)",
+      "columnName": "sale_qty"
+    },
+    {
+      "comment": "客单价",
+      "position": 18,
+      "type": "decimal(20,2)",
+      "columnName": "sale_price"
+    },
+    {
+      "comment": "连带率",
+      "position": 19,
+      "type": "decimal(20,2)",
+      "columnName": "sale_rate"
+    },
+    {
+      "comment": "件单价",
+      "position": 20,
+      "type": "decimal(20,2)",
+      "columnName": "single_price"
+    },
+    {
+      "comment": "销售件数",
+      "position": 21,
+      "type": "decimal(20,2)",
+      "columnName": "goods_qty"
+    },
+    {
+      "comment": "进店客流量",
+      "position": 22,
+      "type": "decimal(20,2)",
+      "columnName": "passengers_flow"
+    },
+    {
+      "comment": "转化率",
+      "position": 23,
+      "type": "decimal(20,2)",
+      "columnName": "passengers_flow_rate"
+    },
+    {
+      "comment": "总库存数量",
+      "position": 24,
+      "type": "decimal(20,2)",
+      "columnName": "total_stock"
+    },
+    {
+      "comment": "总库存金额",
+      "position": 25,
+      "type": "decimal(20,2)",
+      "columnName": "total_stock_money"
+    },
+    {
+      "comment": "可用库存数量",
+      "position": 26,
+      "type": "decimal(20,2)",
+      "columnName": "available_stock"
+    },
+    {
+      "comment": "可用库存金额",
+      "position": 27,
+      "type": "decimal(20,2)",
+      "columnName": "available_money"
+    },
+    {
+      "comment": "门店库存品项数",
+      "position": 28,
+      "type": "decimal(20,2)",
+      "columnName": "store_qty"
+    },
+    {
+      "comment": "是否线上",
+      "position": 29,
+      "type": "string",
+      "columnName": "is_online"
+    },
+    {
+      "comment": "渠道",
+      "position": 30,
+      "type": "string",
+      "columnName": "bs"
+    },
+    {
+      "comment": "数据加载时间",
+      "position": 31,
+      "type": "string",
+      "columnName": "data_load_time"
+    }
+  ],
+  "partitionKeys": [
+    {
+      "comment": "日期",
+      "position": 0,
+      "type": "string",
+      "columnName": "ds"
+    }
+  ],
+  "storageDesc": {
+    "serDeInfo": {
+      "parameters": {
+        "serialization.format": "1"
+      },
+      "serializationLib": "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+    },
+    "bucketCols": [],
+    "storedAsSubDirectories": true,
+    "numBuckets": -1,
+    "compressed": false,
+    "outputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
+    "inputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+    "parameters": {},
+    "location": "hdfs://miniso-newpt1:8020/warehouse/tablespace/managed/hive/ads.db/ads_rpt_wow_cn_counter"
+  },
+  "temporary": false,
+  "tableType": "MANAGED_TABLE",
+  "parameters": {
+    "transient_lastDdlTime": "1689495248",
+    "bucketing_version": "2",
+    "parquet.compression": "SNAPPY",
+    "comment": "WOW门店收银日报"
+  },
+  "retention": 0,
+  "lastAccessTime": 0,
+  "createTime": 1689495248,
+  "owner": "hue",
+  "tableName": "ads_rpt_wow_cn_counter",
+  "dataBaseName": "ads",
+  "objectType": "TABLE",
+  "operationName": "CREATETABLE"
+}

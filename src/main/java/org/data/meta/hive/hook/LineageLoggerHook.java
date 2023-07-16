@@ -39,7 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -166,7 +165,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 String message = new String(EventCodecs.encode(event));
                 //TODO 不是所有的消息都往kafka发的，可以做一个判断
                 LOG.info("开始发送消息");
-                notificationInterface.send(message);
+                //notificationInterface.send(message);
                 LOG.info("发送消息完毕");
             } catch (Throwable t) {
                 this.log("Failed to log lineage graph, query is not affected\n" + StringUtils.stringifyException(t));

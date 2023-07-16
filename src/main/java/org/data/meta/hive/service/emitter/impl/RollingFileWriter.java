@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 
 public class RollingFileWriter {
     private static final Logger LOG = LoggerFactory.getLogger(RollingFileWriter.class);
-    private static final String FILE_TMP_DIR = "/var/log";
+    private static final String FILE_TMP_DIR = "/var/log/hive";
     private long lastCheckFileTime = 0L;
     private int lines = 0;
     private FileWriter writer = null;
@@ -97,7 +97,7 @@ public class RollingFileWriter {
     }
 
     private File findWritingFile() {
-        String dir = "/var/log" + File.separator + System.getProperty("user.name") + File.separator;
+        String dir = "/var/log/hive" + File.separator + System.getProperty("user.name") + File.separator;
         File fileDir = new File(dir);
         if (!fileDir.exists() && !fileDir.mkdirs()) {
             LOG.error("create log file failed : {}", this.file);

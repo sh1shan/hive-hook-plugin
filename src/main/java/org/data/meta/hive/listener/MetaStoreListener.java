@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -46,6 +47,9 @@ import org.data.meta.hive.util.MetaLogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 自定义Listener插件，监听重写的operate
+ */
 public class MetaStoreListener extends MetaStoreEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(MetaStoreListener.class);
 
@@ -94,8 +98,8 @@ public class MetaStoreListener extends MetaStoreEventListener {
             List<PartitionInfo> partitionInfos = new ArrayList<>();
 
             try {
-                while(iterator.hasNext()) {
-                    Partition partition = (Partition)iterator.next();
+                while (iterator.hasNext()) {
+                    Partition partition = (Partition) iterator.next();
                     PartitionInfo partitionInfo = this.buildPartitionInfo(partition, table, conf, false);
                     if (partitionInfo != null) {
                         partitionInfos.add(partitionInfo);
@@ -220,6 +224,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
         int retention = table.getRetention();
         int lastAccessTime = table.getLastAccessTime();
         Map<String, String> parameters = table.getParameters();
+
         createTableAction.setColumns(getColumns(cols));
         createTableAction.setTemporary(temporary);
         createTableAction.setPartitionKeys(getColumns(partitionKeys));
@@ -227,8 +232,8 @@ public class MetaStoreListener extends MetaStoreEventListener {
         createTableAction.setTableType(tableType);
         createTableAction.setParameters(parameters);
         createTableAction.setRetention(retention);
-        createTableAction.setLastAccessTime((long)lastAccessTime);
-        createTableAction.setCreateTime((long)createTime);
+        createTableAction.setLastAccessTime(lastAccessTime);
+        createTableAction.setCreateTime(createTime);
         createTableAction.setOwner(owner);
         createTableAction.setTableName(tableName);
         createTableAction.setDataBaseName(dbName);
@@ -293,8 +298,8 @@ public class MetaStoreListener extends MetaStoreEventListener {
                 String partitionName = MetaLogUtils.getPartitionName(partitionKeys, partitionValues);
                 PartitionInfo partitionInfo = new PartitionInfo();
                 partitionInfo.setPartitionName(partitionName);
-                partitionInfo.setCreateTime((long)partition.getCreateTime());
-                partitionInfo.setLastAccessTime((long)partition.getLastAccessTime());
+                partitionInfo.setCreateTime((long) partition.getCreateTime());
+                partitionInfo.setLastAccessTime((long) partition.getLastAccessTime());
                 partitionInfo.setBucketNum(partition.getSd().getNumBuckets());
                 if (!omitResolvingPath) {
                     Path path = this.getDataLocation(table, partition);
@@ -321,8 +326,8 @@ public class MetaStoreListener extends MetaStoreEventListener {
 
             List<String> partitionKeyValues = new ArrayList<>();
 
-            for(int i = 0; i < partitionKeys.size(); ++i) {
-                partitionKeyValues.add(((FieldSchema)partitionKeys.get(i)).getName() + "=" + (String)partition.getValues().get(i));
+            for (int i = 0; i < partitionKeys.size(); ++i) {
+                partitionKeyValues.add(((FieldSchema) partitionKeys.get(i)).getName() + "=" + (String) partition.getValues().get(i));
             }
 
             return StringUtils.join(partitionKeyValues, "/");
