@@ -47,6 +47,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 自定义Hook解析字段级血缘关系，输出到指定到文件中
@@ -79,7 +80,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
     }
 
     @Override
-    public void run(final HookContext hookContext){
+    public void run(final HookContext hookContext) {
         assert hookContext.getHookType() == HookContext.HookType.POST_EXEC_HOOK;
         //执行计划
         final QueryPlan plan = hookContext.getQueryPlan();
@@ -97,6 +98,8 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
 //        LOG.info(("========================================")); //hive/miniso-newpt2@MINISO-BDP-TEST.CN
 //        LOG.info("hookContext.getUgi().getUserName(): " + hookContext.getUgi().getUserName());
 //        LOG.info(("========================================"));
+//        QueryPlan  getOperation 的 Privilege.ALTER_DATA 是 update 操作
+//        TODO 在确认是不是可以认为没有输出的查询动作可以认定是读操作，反之有输出表的查询动作写操作，在这个hook中我们可以拿到用户，执行时间，执行的sql
 
 
         //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
@@ -165,6 +168,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 String message = new String(EventCodecs.encode(event));
                 //TODO 不是所有的消息都往kafka发的，可以做一个判断
                 LOG.info("开始发送消息");
+                LOG.info(message);
                 //notificationInterface.send(message);
                 LOG.info("发送消息完毕");
             } catch (Throwable t) {
@@ -337,7 +341,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
             columnLineage.setTargets(targets);
             //TODO 对于没有source的字段，这边过滤掉
             //TODO 我只要 PROJECTION 不要 PREDICATE，如果需要可以去掉这个判断，两个都打印出来
-            if (sources.size() != 0 && edgeType == Edge.Type.PROJECTION && targets.size() !=0) {
+            if (sources.size() != 0 && edgeType == Edge.Type.PROJECTION && targets.size() != 0) {
                 columnLineages.add(columnLineage);
             }
         }

@@ -27,18 +27,11 @@ import org.apache.hadoop.hive.metastore.events.CreateTableEvent;
 import org.apache.hadoop.hive.metastore.events.DropDatabaseEvent;
 import org.apache.hadoop.hive.metastore.events.DropPartitionEvent;
 import org.apache.hadoop.hive.metastore.events.DropTableEvent;
+import org.apache.hadoop.hive.metastore.events.InsertEvent;
 import org.data.meta.hive.model.PartitionInfo;
 import org.data.meta.hive.model.StorageSerDeInfo;
 import org.data.meta.hive.model.TableStorageDesc;
-import org.data.meta.hive.model.action.AddPartitionAction;
-import org.data.meta.hive.model.action.AlterPartitionAction;
-import org.data.meta.hive.model.action.AlterTableAction;
-import org.data.meta.hive.model.action.CreateDataBaseAction;
-import org.data.meta.hive.model.action.CreateTableAction;
-import org.data.meta.hive.model.action.DropDataBaseAction;
-import org.data.meta.hive.model.action.DropPartitionAction;
-import org.data.meta.hive.model.action.DropTableAction;
-import org.data.meta.hive.model.action.HiveMetaAction;
+import org.data.meta.hive.model.action.*;
 import org.data.meta.hive.model.event.HiveMetaEvent;
 import org.data.meta.hive.service.emitter.EventEmitterFactory;
 import org.data.meta.hive.util.HdfsUtils;
@@ -58,7 +51,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onCreateTable(CreateTableEvent tableEvent) throws MetaException {
+    public void onCreateTable(CreateTableEvent tableEvent) {
         if (tableEvent.getStatus()) {
             Table table = this.normalizeTable(tableEvent.getTable());
             CreateTableAction createTableAction = new CreateTableAction();
@@ -68,7 +61,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onDropTable(DropTableEvent tableEvent) throws MetaException {
+    public void onDropTable(DropTableEvent tableEvent) {
         if (tableEvent.getStatus()) {
             Table table = this.normalizeTable(tableEvent.getTable());
             DropTableAction dropTableAction = new DropTableAction();
@@ -79,7 +72,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onAlterTable(AlterTableEvent tableEvent) throws MetaException {
+    public void onAlterTable(AlterTableEvent tableEvent) {
         if (tableEvent.getStatus()) {
             Table oldTable = this.normalizeTable(tableEvent.getOldTable());
             Table table = this.normalizeTable(tableEvent.getNewTable());
@@ -90,7 +83,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onAddPartition(AddPartitionEvent partitionEvent) throws MetaException {
+    public void onAddPartition(AddPartitionEvent partitionEvent) {
         if (partitionEvent.getStatus()) {
             Iterator<Partition> iterator = partitionEvent.getPartitionIterator();
             Table table = this.normalizeTable(partitionEvent.getTable());
@@ -99,7 +92,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
 
             try {
                 while (iterator.hasNext()) {
-                    Partition partition = (Partition) iterator.next();
+                    Partition partition = iterator.next();
                     PartitionInfo partitionInfo = this.buildPartitionInfo(partition, table, conf, false);
                     if (partitionInfo != null) {
                         partitionInfos.add(partitionInfo);
@@ -122,7 +115,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onDropPartition(DropPartitionEvent partitionEvent) throws MetaException {
+    public void onDropPartition(DropPartitionEvent partitionEvent) {
         if (partitionEvent.getStatus()) {
             Table table = this.normalizeTable(partitionEvent.getTable());
             List<String> partitions = new ArrayList<>();
@@ -147,7 +140,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onAlterPartition(AlterPartitionEvent partitionEvent) throws MetaException {
+    public void onAlterPartition(AlterPartitionEvent partitionEvent) {
         if (partitionEvent.getStatus()) {
             Table table = this.normalizeTable(partitionEvent.getTable());
             Partition newPartition = partitionEvent.getNewPartition();
@@ -181,7 +174,7 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onCreateDatabase(CreateDatabaseEvent dbEvent) throws MetaException {
+    public void onCreateDatabase(CreateDatabaseEvent dbEvent) {
         if (dbEvent.getStatus()) {
             Database database = this.normalizeDatabase(dbEvent.getDatabase());
             String databaseName = database.getName();
@@ -202,12 +195,24 @@ public class MetaStoreListener extends MetaStoreEventListener {
     }
 
     @Override
-    public void onDropDatabase(DropDatabaseEvent dbEvent) throws MetaException {
+    public void onDropDatabase(DropDatabaseEvent dbEvent) {
         if (dbEvent.getStatus()) {
             Database database = this.normalizeDatabase(dbEvent.getDatabase());
             DropDataBaseAction dropDataBaseAction = new DropDataBaseAction();
             dropDataBaseAction.setDataBaseName(database.getName());
             this.emitAction(dropDataBaseAction);
+        }
+    }
+
+    @Override
+    public void onInsert(InsertEvent insertEvent) throws MetaException {
+        if (insertEvent.getStatus()){
+            InsertTableEvent insertTableEvent = new InsertTableEvent();
+            insertTableEvent.setDb(insertEvent.getDb());
+            insertTableEvent.setTable(insertEvent.getTable());
+            insertTableEvent.setFiles(insertEvent.getFiles());
+            insertTableEvent.setKeyValues(insertEvent.getPartitionKeyValues());
+            this.emitAction(insertTableEvent);
         }
     }
 
@@ -220,8 +225,11 @@ public class MetaStoreListener extends MetaStoreEventListener {
         boolean temporary = table.isTemporary();
         List<FieldSchema> partitionKeys = table.getPartitionKeys();
         String tableType = table.getTableType();
+        //时间戳 单位 秒
         int createTime = table.getCreateTime();
+        //时间戳 单位 秒
         int retention = table.getRetention();
+        //时间戳 单位 秒
         int lastAccessTime = table.getLastAccessTime();
         Map<String, String> parameters = table.getParameters();
 
