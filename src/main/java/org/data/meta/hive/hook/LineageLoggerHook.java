@@ -31,9 +31,11 @@ import org.data.meta.hive.model.lineage.LineageTableColumn;
 import org.data.meta.hive.model.lineage.TableLineage;
 import org.data.meta.hive.model.lineage.Vertex;
 import org.data.meta.hive.service.codec.EventCodecs;
+import org.data.meta.hive.service.emitter.EventEmitterFactory;
 import org.data.meta.hive.service.notification.KafkaNotification;
 import org.data.meta.hive.service.notification.NotificationInterface;
 import org.data.meta.hive.util.EventUtils;
+import org.data.meta.hive.util.JsonUtils;
 import org.data.meta.hive.util.MetaLogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,8 +103,6 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
 //        QueryPlan  getOperation 的 Privilege.ALTER_DATA 是 update 操作
 //        TODO 在确认是不是可以认为没有输出的查询动作可以认定是读操作，反之有输出表的查询动作写操作，在这个hook中我们可以拿到用户，执行时间，执行的sql
 
-
-        //org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx,血缘的上下文
         final LineageCtx.Index index = hookContext.getIndex();
         final SessionState ss = SessionState.get();
         //if (ss != null && index != null && LineageLoggerHook.OPERATION_NAMES.contains(plan.getOperationName()) && !plan.isExplain() && !hookContext.getUserName().equals("hue")) {
@@ -172,7 +172,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
                 //notificationInterface.send(message);
                 LOG.info("发送消息完毕");
             } catch (Throwable t) {
-                this.log("Failed to log lineage graph, query is not affected\n" + StringUtils.stringifyException(t));
+                this.log(" my hook plugin failed to log lineage graph, query is not affected\n" + StringUtils.stringifyException(t));
             }
         }
     }
@@ -404,7 +404,7 @@ public class LineageLoggerHook implements ExecuteWithHookContext {
         final String[] parts = fieldName.split("\\.");
         if (destTableName != null) {
             String colName = parts[parts.length - 1];
-            if (colNames != null && !colNames.contains(colName)) {
+            if (colNames != null && !colNames.contains(colName) && !colName.startsWith("_col")) {
                 colName = colNames.get(fieldIndex);
             }
             return destTableName + "." + colName;

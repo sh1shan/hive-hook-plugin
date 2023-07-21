@@ -112,7 +112,7 @@
     </property>
     <property>
       <name>hive.exec.post.hooks</name>
-      <value>org.apache.hadoop.hive.ql.hooks.LineageLogger,org.data.meta.hive.hook.LineageLoggerHook</value>
+      <value>org.apache.hadoop.hive.ql.hooks.HiveProtoLoggingHook,org.apache.hadoop.hive.ql.hooks.LineageLogger,org.data.meta.hive.hook.LineageLoggerHook</value>
     </property>
     ```
 3. 打开hive cli 执行导数操作
